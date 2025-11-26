@@ -2,7 +2,7 @@ import { Socket } from "socket.io";
 import { redis } from "../utils/redis/redisClient";
 
 export async function handleAuth(socket: Socket, payload: any) {
-  const { userId, username } = payload || {};
+  const { userId, username, gender } = payload || {};
   if (!userId) {
     socket.emit("auth:error", "userId required");
     return;
@@ -10,6 +10,7 @@ export async function handleAuth(socket: Socket, payload: any) {
 
   socket.data.userId = userId;
   socket.data.username = username ?? "";
+  socket.data.gender = gender ?? ""; // Store user's actual gender
 
   const now = Date.now();
 
@@ -18,14 +19,14 @@ export async function handleAuth(socket: Socket, payload: any) {
     socketId: socket.id,
     lastSeen: String(now),
     username: username ?? "",
+    gender: gender ?? "", // Persist gender in Redis
+    currentRoom: ""
   });
 
-  // lobal availability pools
-  await redis.sadd("available", userId);
-  await redis.zadd("available_by_time", now, userId);
-
+  
   // presence TTL
   await redis.expire(`user:${userId}`, 30);
 
   socket.emit("auth:ok");
+  console.log(`[auth] User ${userId} authenticated with gender: ${gender}`);
 }

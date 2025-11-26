@@ -5,25 +5,30 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, password, username } = body;
+    const { email, password, username, phoneNumber, gender } = body;
 
-    // Validation
-    if (!email || !password || !username) {
+    // Basic validation
+    if (!email || !password || !username || !phoneNumber || !gender) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    // Check if user already exists (email or username)
+    // Check existing user
     const existingUser = await prisma.user.findFirst({
       where: {
-        OR: [{ email: email }, { username: username }],
+        OR: [{ email }, { username }, { phoneNumber }],
       },
     });
 
     if (existingUser) {
-      const field = existingUser.email === email ? "Email" : "Username";
+      const field = existingUser.email === email
+        ? "Email"
+        : existingUser.username === username
+        ? "Username"
+        : "Phone number";
+
       return NextResponse.json(
         { error: `${field} already exists` },
         { status: 400 }
@@ -35,25 +40,25 @@ export async function POST(req: Request) {
     const createdUser = await prisma.user.create({
       data: {
         email: email.toLowerCase(),
-        passwordHash: passwordHash,
-        username: username,
+        passwordHash,
+        username,
         name: username,
-        isAnonymous: false, // Set to false for registered users
+        isAnonymous: false,
+        phoneNumber,
+        gender,
       },
       select: {
         id: true,
         email: true,
         username: true,
-        name: true,
+        phoneNumber: true,
+        gender: true,
         createdAt: true,
       },
     });
 
     return NextResponse.json(
-      {
-        message: "User created successfully",
-        user: createdUser,
-      },
+      { message: "User created successfully", user: createdUser },
       { status: 201 }
     );
   } catch (error) {

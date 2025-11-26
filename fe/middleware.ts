@@ -6,7 +6,8 @@ export default withAuth(
     const token = req.nextauth.token;
     const isAuthPage =
       req.nextUrl.pathname.startsWith("/login") ||
-      req.nextUrl.pathname.startsWith("/signup");
+      req.nextUrl.pathname.startsWith("/signup") ||
+      req.nextUrl.pathname.startsWith("/complete-profile");
 
     // Redirect authenticated users away from auth pages
     if (isAuthPage && token) {
