@@ -13,10 +13,10 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json();
-    const { name, username, email, password, image } = body;
+    const { name, username, email, password, image, phoneNumber, gender } = body;
 
     // Validate required fields
-    if (!name && !username && !email && !password && !image) {
+    if (!name && !username && !email && !password && !image && !phoneNumber && !gender) {
       return NextResponse.json(
         { error: "At least one field is required for update" },
         { status: 400 }
@@ -78,12 +78,16 @@ export async function PUT(req: Request) {
       email?: string;
       image?: string;
       passwordHash?: string;
+      phoneNumber?: string;
+      gender?: "MALE" | "FEMALE" | "OTHER";
     } = {};
 
     if (name !== undefined) updateData.name = name;
     if (username !== undefined) updateData.username = username;
     if (email !== undefined) updateData.email = email.toLowerCase();
     if (image !== undefined) updateData.image = image;
+    if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
+    if (gender !== undefined) updateData.gender = gender;
 
     // Hash new password if provided
     if (password) {
@@ -107,6 +111,8 @@ export async function PUT(req: Request) {
         email: true,
         image: true,
         isAnonymous: true,
+        phoneNumber: true,
+        gender: true,
         createdAt: true,
         updatedAt: true,
       },

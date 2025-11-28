@@ -53,6 +53,8 @@ export function useRoomChat({
   const selfUsernameRef = useRef(selfUsername);
   const sockIdRef = useRef<string | null>(null);
   const hasJoinedRoom = useRef<string | null>(null);
+  // FIXED: Track message IDs to prevent duplicates
+  const processedMessageIds = useRef<Set<string>>(new Set());
 
   roomRef.current = roomId;
   selfUserIdRef.current = selfUserId;
@@ -68,20 +70,29 @@ export function useRoomChat({
     }
   }, [state.messages]);
 
-  // Reset on room change
+  // FIXED: Reset on room change and clear processed IDs
   useEffect(() => {
     console.log("[RoomChat] room changed → reset messages; roomId=", roomId);
     dispatch({ type: "RESET" });
     hasJoinedRoom.current = null;
+    processedMessageIds.current.clear();
   }, [roomId]);
 
-  // Join room when roomId is available
+  // FIXED: Join room when roomId is available - only once per room
   useEffect(() => {
     if (!socket || !roomId || hasJoinedRoom.current === roomId) return;
     
     console.log("[RoomChat] Joining room via socket:", roomId);
     socket.emit("room:join", { roomId });
     hasJoinedRoom.current = roomId;
+    
+    // Add a small delay and verify we're in the room
+    setTimeout(() => {
+      if (socket.connected && roomRef.current === roomId) {
+        console.log("[RoomChat] Verifying room membership for:", roomId);
+        // Optionally re-emit if needed
+      }
+    }, 100);
   }, [socket, roomId]);
 
   // Attach/detach socket listeners
@@ -92,7 +103,7 @@ export function useRoomChat({
     }
 
     sockIdRef.current = (socket as Socket).id ?? null;
-    console.log("[RoomChat] attaching listeners; socketId=", sockIdRef.current, "roomId=", roomRef.current, "selfUserId=", selfUserIdRef.current, "selfUsername=", selfUsernameRef.current);
+    console.log("[RoomChat] attaching listeners; socketId=", sockIdRef.current, "roomId=", roomRef.current);
 
     const onIncoming = (payload: { from?: string; text: string; ts?: number; roomId?: string }) => {
       // Guard wrong room if provided
@@ -106,16 +117,33 @@ export function useRoomChat({
       }
 
       const ts = payload.ts || Date.now();
+      const from = payload.from || "unknown";
+      
+      // FIXED: Create unique message ID and check for duplicates
+      const msgId = `${from}_${ts}_${payload.text.substring(0, 20)}`;
+      if (processedMessageIds.current.has(msgId)) {
+        console.log("[RoomChat] Duplicate message detected, skipping:", msgId);
+        return;
+      }
+      
+      processedMessageIds.current.add(msgId);
+      
+      // Clean up old message IDs (keep last 100)
+      if (processedMessageIds.current.size > 100) {
+        const arr = Array.from(processedMessageIds.current);
+        processedMessageIds.current = new Set(arr.slice(-100));
+      }
+
       const isSelf =
         payload.from === selfUserIdRef.current ||
         payload.from === selfUsernameRef.current;
 
-      console.log("[RoomChat] recv chat:message; socketId=", sockIdRef.current, "roomId=", roomRef.current, "from=", payload.from, "text=", payload.text, "ts=", ts, "isSelf=", isSelf);
+      console.log("[RoomChat] recv chat:message; from=", payload.from, "text=", payload.text, "isSelf=", isSelf);
 
       dispatch({
         type: "PUSH",
         payload: {
-          id: `${payload.from}_${ts}_${Math.random().toString(36).slice(2)}`,
+          id: msgId,
           from: payload.from,
           text: payload.text,
           ts,
@@ -131,12 +159,14 @@ export function useRoomChat({
         return;
       }
 
-      console.log("[RoomChat] recv chat:system; socketId=", sockIdRef.current, "roomId=", roomRef.current, "text=", text);
+      console.log("[RoomChat] recv chat:system; text=", text);
 
+      const msgId = `sys_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      
       dispatch({
         type: "PUSH",
         payload: {
-          id: `sys_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+          id: msgId,
           text,
           ts: Date.now(),
           system: true,
@@ -148,7 +178,7 @@ export function useRoomChat({
     socket.on("chat:system", onSystem);
 
     return () => {
-      console.log("[RoomChat] detaching listeners; socketId=", sockIdRef.current, "roomId=", roomRef.current);
+      console.log("[RoomChat] detaching listeners");
       socket.off("chat:message", onIncoming);
       socket.off("chat:system", onSystem);
     };
@@ -158,11 +188,11 @@ export function useRoomChat({
   const send = useCallback(
     (text: string) => {
       if (!socket) {
-        console.log("[RoomChat] send aborted: no socket", { text, roomId: roomRef.current, selfUserId: selfUserIdRef.current });
+        console.log("[RoomChat] send aborted: no socket");
         return false;
       }
       if (!roomRef.current) {
-        console.log("[RoomChat] send aborted: no roomId", { text, selfUserId: selfUserIdRef.current });
+        console.log("[RoomChat] send aborted: no roomId");
         return false;
       }
 
@@ -172,10 +202,16 @@ export function useRoomChat({
         return false;
       }
 
-      console.log("[RoomChat] send chat:send; socketId=", (socket as Socket)?.id, "roomId=", roomRef.current, "from=", selfUserIdRef.current, "selfUsername=", selfUsernameRef.current, "text=", trimmed);
+      console.log("[RoomChat] send chat:send; roomId=", roomRef.current, "text=", trimmed);
 
-      // emit to server (don't add optimistic message - server will echo it back)
-      socket.emit("chat:send", { roomId: roomRef.current, text: trimmed });
+      // FIXED: Emit with proper payload structure
+      socket.emit("chat:send", { 
+        roomId: roomRef.current, 
+        text: trimmed,
+        from: selfUserIdRef.current,
+        username: selfUsernameRef.current
+      });
+      
       return true;
     },
     [socket]
@@ -185,6 +221,7 @@ export function useRoomChat({
     console.log("[RoomChat] manual reset()");
     dispatch({ type: "RESET" });
     hasJoinedRoom.current = null;
+    processedMessageIds.current.clear();
   }, []);
 
   return {

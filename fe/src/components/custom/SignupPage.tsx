@@ -16,20 +16,10 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [countryCode, setCountryCode] = useState("+91");
+  const [gender, setGender] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [currentTime, setCurrentTime] = useState("");
-
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const time = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
-      const date = now.toLocaleDateString("en-IN", { weekday: "short", month: "short", day: "numeric" });
-      setCurrentTime(`${date}, ${time} IST`);
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +38,7 @@ export default function SignupPage() {
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, username }),
+      body: JSON.stringify({ email, password, username, phoneNumber: `${countryCode}${phoneNumber}`, gender }),
     });
 
     const data = await res.json();
@@ -92,13 +82,9 @@ export default function SignupPage() {
           <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
           Back to Home
         </Link>
-        <div className="flex items-center gap-2 text-amber-200 text-xs font-medium">
-          <Globe size={14} className="text-amber-400" />
-          <span className="font-mono tracking-wider">{currentTime}</span>
-        </div>
       </div>
 
-      <Card className="relative z-10 w-full max-w-md bg-white/8 backdrop-blur-2xl border border-amber-500/30 rounded-xl shadow-2xl shadow-amber-500/20 p-8">
+      <Card className="relative z-10 w-full max-w-md bg-white/8 backdrop-blur-2xl border border-amber-500/30 rounded-xl shadow-2xl shadow-amber-500/20 p-8 mt-12 md:mt-0">
         <div className="text-center mb-10">
           <h1 className="text-4xl font-black tracking-tight" style={{ fontFamily: "var(--font-cinzel), serif" }}>
             <span className="bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-300 bg-clip-text text-transparent">
@@ -135,6 +121,37 @@ export default function SignupPage() {
               className="pl-11 h-12 bg-white/10 border-amber-500/30 text-amber-50 placeholder-amber-200/50 focus:border-amber-400 focus:ring-amber-400/20 rounded-md"
             />
           </div>
+          <div className="flex gap-2 mb-4">
+          <select
+            value={countryCode}
+            onChange={(e) => setCountryCode(e.target.value)}
+            className="w-24 h-12 bg-white/10 border-amber-500/30 text-amber-400 rounded-md focus:border-amber-400 p-2"
+          >
+            <option value="+91">🇮🇳 +91</option>
+            <option value="+1">🇺🇸 +1</option>
+            <option value="+44">🇬🇧 +44</option>
+          </select>
+          <Input
+            type="tel"
+            placeholder="Phone number"
+            required
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            className="flex-1 h-12 bg-white/10 border-amber-500/30 text-amber-50 placeholder-amber-200/50 focus:border-amber-400 rounded-md"
+          />
+        </div>
+
+        <select
+          required
+          value={gender}
+          onChange={(e) => setGender(e.target.value)}
+          className="w-full h-12 bg-white/10 border-amber-500/30 text-amber-400 rounded-md focus:border-amber-400 focus:ring-amber-400/20 mb-6 p-2"
+        >
+          <option value="">Select Gender</option>
+          <option value="MALE">Male</option>
+          <option value="FEMALE">Female</option>
+          <option value="OTHER">Other</option>
+        </select>
 
           <Button type="submit" disabled={isLoading}
             className="w-full h-13 bg-gradient-to-r from-amber-500 to-yellow-600 text-black font-bold text-lg rounded-md shadow-xl cursor-pointer">

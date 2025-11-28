@@ -9,67 +9,50 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { useGetUser } from "@/hooks/use-getuser";
 
+// ---------- Types ----------
+type GenderType = "MALE" | "FEMALE" | "OTHER";
+
 type FormDataState = {
   name: string;
   username: string;
   email: string;
-  bio: string;
   location: string;
+  phoneNumber: string;
+  gender: GenderType;
 };
 
-type ProfileField = keyof FormDataState;
-
-type FieldDef = {
-  label: string;
-  key: ProfileField;
-  multiline?: boolean;
-};
-
-/* --- small type guards for safe JSON handling --- */
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null;
-}
-function getStringProp(obj: unknown, key: string): string | undefined {
-  if (!isRecord(obj)) return undefined;
-  const v = obj[key];
-  return typeof v === "string" ? v : undefined;
-}
-function getPartialForm(obj: unknown): Partial<FormDataState> | undefined {
-  if (!isRecord(obj)) return undefined;
-  const out: Partial<FormDataState> = {};
-  (["name", "username", "email", "bio", "location"] as const).forEach((k) => {
-    const val = obj[k];
-    if (typeof val === "string") (out as Record<string, string>)[k] = val;
-  });
-  return Object.keys(out).length ? out : undefined;
-}
-
+// ---------- Component ----------
 export default function ProfileSettingsPage() {
   const user = useGetUser();
-  const [isEditing, setIsEditing] = useState<ProfileField | null>(null);
+  const [isEditing, setIsEditing] = useState<keyof FormDataState | null>(null);
   const [currentTime, setCurrentTime] = useState("");
+  const [savingField, setSavingField] = useState<keyof FormDataState | null>(
+    null
+  );
 
   const [formData, setFormData] = useState<FormDataState>({
     name: "",
     username: "",
     email: "",
-    bio: "Lover of chai, cricket, and deep conversations 🌿",
     location: "India",
+    phoneNumber: "",
+    gender: "OTHER",
   });
 
-  const [savingField, setSavingField] = useState<ProfileField | null>(null);
-
+  // ---------- Load user ----------
   useEffect(() => {
     if (!user) return;
     setFormData({
       name: user.name ?? "",
       username: user.username ?? "",
       email: user.email ?? "",
-      bio: "Lover of chai, cricket, and deep conversations 🌿",
       location: "India",
+      phoneNumber: user.phoneNumber ?? "",
+      gender: user.gender ?? "OTHER",
     });
   }, [user]);
 
+  // ---------- Time update ----------
   useEffect(() => {
     const update = () => {
       const now = new Date();
@@ -86,85 +69,52 @@ export default function ProfileSettingsPage() {
     return () => clearInterval(int);
   }, []);
 
-  const fieldDefs: FieldDef[] = [
-    { label: "Full Name", key: "name" },
-    { label: "Username", key: "username" },
-    { label: "Email", key: "email" },
-    { label: "Bio", key: "bio", multiline: true },
-    { label: "Location", key: "location" },
-  ];
-
-  const setField = <K extends ProfileField>(
+  // ---------- Helpers ----------
+  const setField = <K extends keyof FormDataState>(
     key: K,
     value: FormDataState[K]
   ) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
-  async function handleSave(field: ProfileField) {
+  async function handleSave(field: keyof FormDataState) {
     const value = (formData[field] ?? "").toString().trim();
-    if (
-      !value &&
-      (field === "username" || field === "email" || field === "name")
-    ) {
+
+    // Strict validations
+    if (!value && ["username", "email", "name"].includes(field)) {
       toast.error("Please provide a valid value");
+      return;
+    }
+
+    if (field === "phoneNumber" && !/^\d{10,15}$/.test(value)) {
+      toast.error("Enter a valid phone number (10–15 digits)");
       return;
     }
 
     setSavingField(field);
     try {
-      const payload: Record<ProfileField, string> = {
-        name: formData.name,
-        username: formData.username,
-        email: formData.email,
-        bio: formData.bio,
-        location: formData.location,
-      };
-      const body = JSON.stringify({ [field]: value });
-
       const res = await fetch("/api/updateuser", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body,
+        body: JSON.stringify({ [field]: value }),
       });
 
-      let data: unknown;
-      try {
-        data = await res.json();
-      } catch {
-        data = undefined;
-      }
-
+      const data = await res.json();
       if (!res.ok) {
-        const errMsg =
-          getStringProp(data, "error") ||
-          getStringProp(data, "message") ||
-          `Failed to update ${field}`;
-        toast.error(errMsg);
+        toast.error(data?.message || `Failed to update ${field}`);
       } else {
-        const maybeUser = isRecord(data)
-          ? getPartialForm((data as Record<string, unknown>)["user"])
-          : undefined;
-        if (maybeUser) {
-          setFormData((prev) => ({ ...prev, ...maybeUser }));
-        } else {
-          setFormData((prev) => ({ ...prev, [field]: value }));
-        }
-        toast.success(
-          `${field.charAt(0).toUpperCase() + field.slice(1)} updated`
-        );
+        toast.success(`${field} updated successfully`);
         setIsEditing(null);
       }
     } catch (err) {
-      console.error("updateuser error:", err);
+      console.error("Update error:", err);
       toast.error("Something went wrong while updating");
     } finally {
       setSavingField(null);
     }
   }
 
-  const { data: session, status: sessionStatus } = useSession();
-
+  // ---------- UI ----------
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a140a] via-[#0f1a0f] to-[#0a140a] text-amber-100">
       {/* Header */}
@@ -185,16 +135,14 @@ export default function ProfileSettingsPage() {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main */}
       <main className="pt-20 pb-10 px-6 max-w-2xl mx-auto">
         <div className="text-center mb-12">
           <h1
-            className="text-4xl font-black tracking-tight"
+            className="text-4xl font-black tracking-tight bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-300 bg-clip-text text-transparent"
             style={{ fontFamily: "var(--font-cinzel), serif" }}
           >
-            <span className="bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-300 bg-clip-text text-transparent">
-              Profile Settings
-            </span>
+            Profile Settings
           </h1>
           <p className="text-amber-200/70 mt-3">
             Make your presence truly yours
@@ -218,57 +166,180 @@ export default function ProfileSettingsPage() {
 
         {/* Editable Fields */}
         <div className="space-y-6 bg-white/5 backdrop-blur-2xl rounded-xl p-8 border border-amber-500/20 shadow-2xl">
-          {fieldDefs.map((field) => (
-            <div key={field.key} className="group relative">
-              <label className="text-amber-200/70 text-sm font-medium">
-                {field.label}
-              </label>
+          {/* Full Name */}
+          <EditableField
+            label="Full Name"
+            field="name"
+            value={formData.name}
+            isEditing={isEditing}
+            setIsEditing={setIsEditing}
+            setField={setField}
+            handleSave={handleSave}
+            savingField={savingField}
+          />
 
-              {isEditing === field.key ? (
-                <div className="mt-2 flex items-center gap-3">
-                  {field.multiline ? (
-                    <textarea
-                      value={formData[field.key]}
-                      onChange={(e) => setField(field.key, e.target.value)}
-                      className="flex-1 bg-white/10 border border-amber-500/40 rounded-lg px-4 py-3 text-amber-100 placeholder-amber-300/60 focus:border-amber-400 outline-none transition-all"
-                      rows={3}
-                    />
-                  ) : (
-                    <Input
-                      value={formData[field.key]}
-                      onChange={(e) => setField(field.key, e.target.value)}
-                      className="flex-1 bg-white/10 border-amber-500/40 text-amber-100 placeholder-amber-300/60 focus:border-amber-400 rounded-lg h-12"
-                    />
-                  )}
-                  <button
-                    onClick={() => handleSave(field.key)}
-                    disabled={savingField === field.key}
-                    className="p-3 bg-gradient-to-r from-amber-500 to-yellow-600 rounded-lg hover:shadow-lg hover:shadow-amber-500/40 transition-all disabled:opacity-60"
-                  >
-                    <Check size={18} className="text-black" />
-                  </button>
-                </div>
-              ) : (
-                <div className="mt-2 flex items-center justify-between">
-                  <p className="text-amber-100 font-medium py-3">
-                    {formData[field.key] ? formData[field.key] : "(Not set)"}
-                  </p>
-                  <button
-                    onClick={() => setIsEditing(field.key)}
-                    className="p-2.5 rounded-full bg-white/10 hover:bg-amber-500/20 transition-all opacity-0 group-hover:opacity-100"
-                  >
-                    <Pencil size={16} className="text-amber-400" />
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
+          {/* Username */}
+          <EditableField
+            label="Username"
+            field="username"
+            value={formData.username}
+            isEditing={isEditing}
+            setIsEditing={setIsEditing}
+            setField={setField}
+            handleSave={handleSave}
+            savingField={savingField}
+          />
+
+          {/* Email */}
+          <EditableField
+            label="Email"
+            field="email"
+            value={formData.email}
+            isEditing={isEditing}
+            setIsEditing={setIsEditing}
+            setField={setField}
+            handleSave={handleSave}
+            savingField={savingField}
+          />
+
+          {/* Location */}
+          <EditableField
+            label="Location"
+            field="location"
+            value={formData.location}
+            isEditing={isEditing}
+            setIsEditing={setIsEditing}
+            setField={setField}
+            handleSave={handleSave}
+            savingField={savingField}
+          />
+
+          {/* Phone Number (strict) */}
+          <EditableField
+            label="Phone Number"
+            field="phoneNumber"
+            value={formData.phoneNumber}
+            type="tel"
+            placeholder="Enter 10–15 digit number"
+            isEditing={isEditing}
+            setIsEditing={setIsEditing}
+            setField={setField}
+            handleSave={handleSave}
+            savingField={savingField}
+          />
+
+          {/* Gender (Dropdown) */}
+          <div className="group relative">
+            <label className="text-amber-200/70 text-sm font-medium">
+              Gender
+            </label>
+            {isEditing === "gender" ? (
+              <div className="mt-2 flex items-center gap-3">
+                <select
+                  value={formData.gender}
+                  onChange={(e) =>
+                    setField("gender", e.target.value as GenderType)
+                  }
+                  className="flex-1 bg-white/10 border border-amber-500/40 rounded-lg px-4 py-3 text-amber-100 focus:border-amber-400 outline-none transition-all"
+                >
+                  <option value="MALE">MALE</option>
+                  <option value="FEMALE">FEMALE</option>
+                  <option value="OTHER">OTHER</option>
+                </select>
+                <button
+                  onClick={() => handleSave("gender")}
+                  disabled={savingField === "gender"}
+                  className="p-3 bg-gradient-to-r from-amber-500 to-yellow-600 rounded-lg hover:shadow-lg hover:shadow-amber-500/40 transition-all disabled:opacity-60"
+                >
+                  <Check size={18} className="text-black" />
+                </button>
+              </div>
+            ) : (
+              <div className="mt-2 flex items-center justify-between">
+                <p className="text-amber-100 font-medium py-3">
+                  {formData.gender}
+                </p>
+                <button
+                  onClick={() => setIsEditing("gender")}
+                  className="p-2.5 rounded-full bg-white/10 hover:bg-amber-500/20 transition-all"
+                >
+                  <Pencil size={16} className="text-amber-400" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <p className="text-center text-xs text-amber-200/50 mt-8">
           Your profile reflects who you are. Make it authentic.
         </p>
       </main>
+    </div>
+  );
+}
+
+// ---------- Reusable EditableField ----------
+function EditableField({
+  label,
+  field,
+  value,
+  isEditing,
+  setIsEditing,
+  setField,
+  handleSave,
+  savingField,
+  type = "text",
+  placeholder,
+}: {
+  label: string;
+  field: keyof FormDataState;
+  value: string;
+  isEditing: keyof FormDataState | null;
+  setIsEditing: React.Dispatch<
+    React.SetStateAction<keyof FormDataState | null>
+  >;
+  setField: <K extends keyof FormDataState>(
+    key: K,
+    value: FormDataState[K]
+  ) => void;
+  handleSave: (field: keyof FormDataState) => void;
+  savingField: keyof FormDataState | null;
+  type?: string;
+  placeholder?: string;
+}) {
+  return (
+    <div className="group relative">
+      <label className="text-amber-200/70 text-sm font-medium">{label}</label>
+      {isEditing === field ? (
+        <div className="mt-2 flex items-center gap-3">
+          <Input
+            type={type}
+            value={value}
+            placeholder={placeholder}
+            onChange={(e) => setField(field, e.target.value as never)}
+            className="flex-1 bg-white/10 border-amber-500/40 text-amber-100 placeholder-amber-300/60 focus:border-amber-400 rounded-lg h-12"
+          />
+          <button
+            onClick={() => handleSave(field)}
+            disabled={savingField === field}
+            className="p-3 bg-gradient-to-r from-amber-500 to-yellow-600 rounded-lg hover:shadow-lg hover:shadow-amber-500/40 transition-all disabled:opacity-60"
+          >
+            <Check size={18} className="text-black" />
+          </button>
+        </div>
+      ) : (
+        <div className="mt-2 flex items-center justify-between">
+          <p className="text-amber-100 font-medium py-3">
+            {value || "(Not set)"}
+          </p>
+          <button
+            onClick={() => setIsEditing(field)}
+            className="p-2.5 rounded-full bg-white/10 hover:bg-amber-500/20 transition-all"
+          >
+            <Pencil size={16} className="text-amber-400" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

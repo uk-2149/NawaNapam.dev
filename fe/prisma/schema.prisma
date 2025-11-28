@@ -18,33 +18,43 @@ datasource db {
 // users
 
 model User {
-  id            String          @id @default(uuid())
-  name          String?
-  username      String?         @unique
-  email         String          @unique
-  emailVerified DateTime?
-  passwordHash  String?
-  isAnonymous   Boolean         @default(true)
-  banned        Boolean         @default(false)
-  image         String?
+  id              String          @id @default(uuid())
+  name            String?
+  username        String?         @unique
+  email           String          @unique
+  emailVerified   DateTime?
+  passwordHash    String?
+  isAnonymous     Boolean         @default(true)
+  banned          Boolean         @default(false)
+  image           String?
 
-  accounts      Account[]
-  sessions      Session[]
-  Authenticator Authenticator[]
+  phoneNumber     String?         @unique
+  gender          Gender?
+
+  accounts        Account[]
+  sessions        Session[]
+  Authenticator   Authenticator[]
 
   // Replace implicit many-to-many with explicit Participant relation
-  participants  Participant[]   // per-room participation records
-  reportsMade   Report[]        @relation("ReportsByUser")
-  reportsAgainst Report[]       @relation("ReportsAgainstUser")
-  moderationLogs ModerationLog[]
-  interests     Interest[]
+  participants    Participant[]   // per-room participation records
+  reportsMade     Report[]        @relation("ReportsByUser")
+  reportsAgainst  Report[]        @relation("ReportsAgainstUser")
+  moderationLogs  ModerationLog[]
+  interests       Interest[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   @@index([isAnonymous])
   @@index([banned])
 }
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
  
 model Account {
   userId            String

@@ -33,7 +33,7 @@ function makeClient(label: string) {
     ...(useTLS ? { tls: { servername: host } } : {}),
   };
 
-  const client = new Redis(opts);
+  const client = new Redis();
   client.on("error", (e) => console.error(`[redis:${label}]`, e.message));
   return client;
 }

@@ -9,13 +9,15 @@ type State = {
   status: SignalingStatus;
   peer: PeerInfo | null;
   roomId: string | null;
+  filterApplied: string | null;
 };
 
 type Action =
   | { type: "SET_STATUS"; payload: SignalingStatus }
   | { type: "SET_MATCH"; payload: { peer: PeerInfo; roomId: string | null } }
   | { type: "END" }
-  | { type: "RESET" };
+  | { type: "RESET" }
+  | { type: "SET_FILTER"; payload: string };
 
 // ---- Reducer ----
 function reducer(state: State, action: Action): State {
@@ -39,36 +41,65 @@ function reducer(state: State, action: Action): State {
         roomId: action.payload.roomId,
       };
     case "END":
-      return { status: "ended", peer: null, roomId: null };
+      return { ...state, status: "ended", peer: null, roomId: null };
     case "RESET":
-      return { status: "idle", peer: null, roomId: null };
+      return {
+        status: "idle",
+        peer: null,
+        roomId: null,
+        filterApplied: state.filterApplied,
+      };
+    case "SET_FILTER":
+      return { ...state, filterApplied: action.payload };
     default:
       return state;
   }
 }
 
 // ---- Constants ----
-const INITIAL: State = { status: "idle", peer: null, roomId: null };
+const INITIAL: State = {
+  status: "idle",
+  peer: null,
+  roomId: null,
+  filterApplied: null,
+};
 
 let socket: Socket | null = null;
 const SIGNALING =
   process.env.NEXT_PUBLIC_SIGNALING_URL || "http://localhost:8080";
 
-let currentIdentity: { userId: string; username?: string } | null = null;
+let currentIdentity: {
+  userId: string;
+  username?: string;
+  gender?: string;
+} | null = null;
 let lastMatchedRoomId: string | null = null;
 let lastMatchRequestAt = 0;
 
 // ---- Utility for colored logs ----
 function log(prefix: string, ...args: unknown[]) {
-  console.log(`%c[Signaling:${prefix}]`, "color: #ffb100; font-weight: bold", ...args);
+  console.log(
+    `%c[Signaling:${prefix}]`,
+    "color: #ffb100; font-weight: bold",
+    ...args
+  );
+}
+
+function normPref(p?: string | null) {
+  const v = (p ?? "random").toLowerCase();
+  return v === "male" || v === "female" ? v : "random";
 }
 
 // ---- Socket Init ----
-export function initSocket(url = SIGNALING) {
+export function initSocket(url = SIGNALING, genderPref?: string) {
   if (socket) return socket;
   log("initSocket", "Creating new socket connection →", url);
 
-  socket = io(url, { transports: ["websocket"], autoConnect: true });
+  socket = io(url, {
+    transports: ["websocket"],
+    autoConnect: true,
+    query: { pref: normPref(genderPref) },
+  });
 
   socket.on("connect_error", (err) =>
     console.error("[Signaling:connect_error]", err)
@@ -90,12 +121,16 @@ export function initSocket(url = SIGNALING) {
 }
 
 // ---- Authentication ----
-export function connectAuth(userId: string, username?: string) {
+export function connectAuth(
+  userId: string,
+  username?: string,
+  gender?: string
+) {
   if (!userId) throw new Error("connectAuth requires userId");
   initSocket();
   if (!socket) throw new Error("socket not initialized");
 
-  currentIdentity = { userId, username };
+  currentIdentity = { userId, username, gender };
   log("auth", "Sending auth payload:", currentIdentity);
   socket.emit("auth", currentIdentity);
 }
@@ -114,9 +149,16 @@ export function disconnectSocket() {
 }
 
 // ---- Core Emits ----
-export function startMatch() {
-  initSocket();
+export function startMatch(genderPref?: string) {
+  const pref = normPref(genderPref);
+
+  initSocket(SIGNALING, pref);
+
   if (!socket) return false;
+
+  if (pref && socket) {
+    socket.io.opts.query = { pref };
+  }
 
   const now = Date.now();
   if (now - lastMatchRequestAt < 300) {
@@ -125,8 +167,8 @@ export function startMatch() {
   }
 
   lastMatchRequestAt = now;
-  log("match", "Emitting → match:request");
-  socket.emit("match:request");
+  log("match", "Emitting → match:request", { pref });
+  socket.emit("match:request", pref);
   return true;
 }
 
@@ -143,7 +185,11 @@ export function onMatchFound(
   initSocket();
   if (!socket) throw new Error("Socket not initialized");
 
-  const handler = (data: { peerId: string; peerUsername?: string; roomId?: string }) => {
+  const handler = (data: {
+    peerId: string;
+    peerUsername?: string;
+    roomId?: string;
+  }) => {
     log("onMatchFound", "Received match:", data);
     cb(data);
   };
@@ -162,14 +208,12 @@ export function onAuthOk(cb: () => void): () => void {
   };
 
   socket.on("auth:ok", handler);
-  // IMPORTANT: do not return the Socket from .off()
   return () => {
     if (socket) {
       socket.off("auth:ok", handler);
     }
   };
 }
-
 
 export function onMatchQueued(cb: () => void) {
   initSocket();
@@ -214,9 +258,13 @@ export function onEndOk(cb: () => void) {
 export function useSignaling({
   userId,
   username,
+  gender,
+  genderPreference,
 }: {
   userId: string;
   username?: string;
+  gender?: string;
+  genderPreference?: string;
 }) {
   const [state, dispatch] = useReducer(reducer, INITIAL);
 
@@ -224,25 +272,24 @@ export function useSignaling({
   const statusRef = useRef<SignalingStatus>("idle");
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hbTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const processedMatchRef = useRef<string | null>(null);
 
   useEffect(() => {
     statusRef.current = state.status;
   }, [state.status]);
 
-  // -----------------------------
-  // Socket + Event Lifecycle
-  // -----------------------------
+  // ---- Socket Event Handlers ----x₹
   useEffect(() => {
     if (!userId) {
       log("useEffect", "Skipped init → Missing userId");
       return;
     }
 
-    const s = initSocket();
+    const s = initSocket(SIGNALING, normPref(genderPreference));
     socketRef.current = s;
-    currentIdentity = { userId, username };
+    currentIdentity = { userId, username, gender };
 
-    log("init", "User session initialized:", { userId, username });
+    log("init", "User session initialized:", { userId, username, gender });
 
     const cleanupFns: Array<() => void> = [];
 
@@ -272,23 +319,40 @@ export function useSignaling({
     };
     startHeartbeat();
 
-    // Match found
+    // FIXED: Match found - ensure we only process once
     const onFound = (data: {
       peerId: string;
       peerUsername?: string;
       roomId?: string;
     }) => {
       const rid = data.roomId ?? null;
-      if (rid && lastMatchedRoomId === rid) {
-        log("match:found", "Duplicate roomId ignored", rid);
-        return;
+
+      // FIXED: Prevent duplicate processing
+      if (rid) {
+        if (processedMatchRef.current === rid) {
+          log(
+            "match:found",
+            "Already processed this match, ignoring duplicate",
+            rid
+          );
+          return;
+        }
+
+        if (lastMatchedRoomId === rid) {
+          log(
+            "match:found",
+            "Duplicate roomId detected, but not yet processed",
+            rid
+          );
+        }
+
+        processedMatchRef.current = rid;
+        lastMatchedRoomId = rid;
       }
 
-      lastMatchedRoomId = rid;
-      log("match:found", "Matched successfully 🎯", data);
+      log("match:found", "Processing match 🎯", data);
 
-      if (rid) s.emit("room:join", { roomId: rid });
-
+      // Immediately update status to matched
       dispatch({
         type: "SET_MATCH",
         payload: {
@@ -297,6 +361,13 @@ export function useSignaling({
         },
       });
 
+      // Join room
+      if (rid) {
+        log("match:found", "Joining room:", rid);
+        s.emit("room:join", { roomId: rid });
+      }
+
+      // Clear any retry timers
       if (retryTimerRef.current) {
         clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
@@ -307,8 +378,14 @@ export function useSignaling({
 
     // Queued
     const onQueued = () => {
-      dispatch({ type: "SET_STATUS", payload: "searching" });
-      log("match:queued", "Queued for matching 🔄");
+      // FIXED: Only set to searching if not already matched
+      if (statusRef.current !== "matched") {
+        dispatch({ type: "SET_STATUS", payload: "searching" });
+        log("match:queued", "Queued for matching 🔄");
+      } else {
+        log("match:queued", "Already matched, ignoring queued event");
+        return;
+      }
 
       if (retryTimerRef.current) return;
       retryTimerRef.current = setTimeout(() => {
@@ -327,7 +404,10 @@ export function useSignaling({
     const onMatchErr = (err: unknown) => {
       log("match:error", "Error caught:", err);
       const msg = typeof err === "string" ? err : String(err);
-      if (msg.includes("NO_PEER")) onQueued();
+      // FIXED: Only requeue if not already matched
+      if (msg.includes("NO_PEER") && statusRef.current !== "matched") {
+        onQueued();
+      }
     };
     s.on("match:error", onMatchErr);
     cleanupFns.push(() => s.off("match:error", onMatchErr));
@@ -337,6 +417,7 @@ export function useSignaling({
       log("end:ok", "Room ended → cleaning up");
       dispatch({ type: "END" });
       lastMatchedRoomId = null;
+      processedMatchRef.current = null;
     };
     s.on("end:ok", onEnd);
     cleanupFns.push(() => s.off("end:ok", onEnd));
@@ -345,14 +426,25 @@ export function useSignaling({
     const onSystem = (payload: { text?: string }) => {
       const t = (payload?.text || "").toLowerCase();
       log("chat:system", "System message received:", payload);
-      if (t.includes("chat ended")) {
-        log("chat:system", "Detected 'Chat ended' message → cleaning up");
+      if (t.includes("chat ended") || t.includes("user disconnected")) {
+        log("chat:system", "Detected end message → cleaning up");
         dispatch({ type: "END" });
         lastMatchedRoomId = null;
+        processedMatchRef.current = null;
       }
     };
     s.on("chat:system", onSystem);
     cleanupFns.push(() => s.off("chat:system", onSystem));
+
+    // FIXED: Listen for peer left events
+    const onPeerLeft = () => {
+      log("rtc:peer-left", "Peer has left the room");
+      dispatch({ type: "END" });
+      lastMatchedRoomId = null;
+      processedMatchRef.current = null;
+    };
+    s.on("rtc:peer-left", onPeerLeft);
+    cleanupFns.push(() => s.off("rtc:peer-left", onPeerLeft));
 
     // Cleanup
     return () => {
@@ -368,7 +460,7 @@ export function useSignaling({
       }
       socketRef.current = null;
     };
-  }, [userId, username]);
+  }, [userId, username, genderPreference]);
 
   // ---- start / next / end / teardown ----
   const start = useCallback(() => {
@@ -378,6 +470,7 @@ export function useSignaling({
       socketRef.current = socket;
     }
     lastMatchedRoomId = null;
+    processedMatchRef.current = null;
     const ok = startMatch();
     log("start", "Match request emitted, ok?", ok);
     if (!ok) socketRef.current?.emit("match:request");
@@ -390,7 +483,11 @@ export function useSignaling({
     if (rid) socketRef.current?.emit("end:room", { roomId: rid });
     dispatch({ type: "RESET" });
     lastMatchedRoomId = null;
-    setTimeout(() => socketRef.current?.emit("match:request"), 200);
+    processedMatchRef.current = null;
+    setTimeout(() => {
+      socketRef.current?.emit("match:request");
+      dispatch({ type: "SET_STATUS", payload: "searching" });
+    }, 200);
   }, [state.roomId]);
 
   const end = useCallback(() => {
@@ -399,6 +496,7 @@ export function useSignaling({
     if (rid) socketRef.current?.emit("end:room", { roomId: rid });
     dispatch({ type: "END" });
     lastMatchedRoomId = null;
+    processedMatchRef.current = null;
   }, [state.roomId]);
 
   const teardown = useCallback(() => {
@@ -411,6 +509,7 @@ export function useSignaling({
     socketRef.current = null;
     currentIdentity = null;
     lastMatchedRoomId = null;
+    processedMatchRef.current = null;
   }, []);
 
   return {

@@ -157,7 +157,7 @@ export default function Footer() {
             Made with
             <Heart size={14} className="text-amber-400 fill-amber-400" />
             in
-            <span className="text-amber-300">Bharat</span>
+            <span className="text-amber-300">Nawa Napam</span>
           </p>
         </div>
       </div>
