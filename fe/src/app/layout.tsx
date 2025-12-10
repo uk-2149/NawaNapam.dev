@@ -1,5 +1,5 @@
 // app/layout.tsx
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google"; // renamed for clarity
 import { Cinzel_Decorative } from "next/font/google"; // ← ADD THIS
 import "./globals.css";
@@ -27,6 +27,25 @@ const cinzelDecorative = Cinzel_Decorative({
 export const metadata: Metadata = {
   title: "NawaNapam ",
   description: "Instant, anonymous, global video chat rooted in culture.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "NawaNapam",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: "/icons/manifest-icon-192.maskable.png",
+    apple: "/icons/apple-icon-180.png",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({

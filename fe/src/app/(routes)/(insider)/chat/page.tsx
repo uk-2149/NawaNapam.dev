@@ -1,25 +1,25 @@
 // app/chat/page.tsx
-import Private from '@/components/auth/Private';
-import VideoChatPage from '@/components/custom/VideoChat';
-import { redirect } from 'next/navigation';
+import Private from "@/components/auth/Private";
+import VideoChatPage from "@/components/custom/VideoChat";
 
-const VALID_PREFS = new Set(['random', 'male', 'female']);
+const VALID_PREFS = new Set(["random", "male", "female"]);
 
-export type GenderFilter = 'random' | 'male' | 'female';
+export type GenderFilter = "random" | "male" | "female";
 
-export default function Chat({
+export default async function Chat({
   searchParams,
 }: {
-  searchParams: { pref?: string };
+  searchParams: Promise<{ pref?: string }>;
 }) {
-  const normalized = (searchParams.pref ?? '').toLowerCase();
+  const params = await searchParams;
+  const normalized = (params.pref ?? "").toLowerCase();
 
   if (!normalized || !VALID_PREFS.has(normalized)) {
     // default or bounce — pick one:
     // return redirect('/dashboard');
     return (
       <Private>
-        <VideoChatPage gender={'random'} />
+        <VideoChatPage gender={"random"} />
       </Private>
     );
   }

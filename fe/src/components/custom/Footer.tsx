@@ -58,6 +58,7 @@ const policies = {
     "User Responsibility: Keep account secure.",
     "Data Retention: Data deleted after account removal.",
   ],
+  "Our Founders": ["Mangal Hansada", "Sambara Hansda"],
 };
 
 export default function Footer() {
