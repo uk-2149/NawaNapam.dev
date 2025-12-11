@@ -183,7 +183,7 @@ export default function HeroSection() {
           </div>
 
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4 max-w-7xl mx-auto">
-            {WHY_CHOOSE_US.map((f, i) => (
+            {WHY_CHOOSE_US.map((f, _i) => (
               <article
                 key={f.title}
                 className="group bg-white/8 backdrop-blur-xl rounded-lg p-8 shadow-xl hover:shadow-2xl hover:shadow-amber-500/20 transition-all duration-500 hover:-translate-y-2 border border-amber-500/20 text-center"

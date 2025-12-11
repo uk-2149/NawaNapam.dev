@@ -5,22 +5,75 @@ import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { useAuthStore } from "@/stores/authStore";
-import {
-  Menu,
-  X,
-  LogOut,
-  Settings,
-  LayoutDashboard,
-  Globe,
-  ArrowLeft,
-} from "lucide-react";
+import { X, LogOut, Settings, LayoutDashboard, Download } from "lucide-react";
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
 
 export default function Header() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [_mobileMenuOpen, _setMobileMenuOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(true);
+  const [isStandalone, setIsStandalone] = useState(false);
 
   const { user, isAuthenticated, isLoading } = useAuthStore();
+
+  // PWA Install Detection
+  useEffect(() => {
+    // Check if already installed
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as { standalone?: boolean }).standalone ||
+      document.referrer.includes("android-app://");
+
+    setIsStandalone(standalone);
+    setShowInstallPrompt(!standalone);
+
+    const handler = (e: BeforeInstallPromptEvent) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener("beforeinstallprompt", handler as EventListener);
+
+    return () =>
+      window.removeEventListener(
+        "beforeinstallprompt",
+        handler as EventListener
+      );
+  }, []);
+
+  const handleInstallClick = async () => {
+    // Check if it's iOS
+    const isIOS =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+      !(window as { MSStream?: unknown }).MSStream;
+
+    if (isIOS) {
+      alert(
+        'To install on iOS:\n1. Tap the Share button\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add" to confirm'
+      );
+      return;
+    }
+
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") {
+        setShowInstallPrompt(false);
+      }
+      setDeferredPrompt(null);
+    } else {
+      alert(
+        'To install this app:\n• Chrome/Edge: Look for the install icon in the address bar\n• Or use the browser menu and select "Install app"'
+      );
+    }
+  };
 
   // Close sidebar when clicking outside
   useEffect(() => {
@@ -265,6 +318,22 @@ export default function Header() {
             />
             <span className="text-base font-medium">Settings</span>
           </Link>
+
+          {/* PWA Install Button */}
+          {showInstallPrompt && !isStandalone && (
+            <button
+              onClick={handleInstallClick}
+              className="flex items-center gap-4 px-4 py-4 text-amber-100 hover:bg-amber-500/10 rounded-lg transition-colors group w-full"
+            >
+              <Download
+                size={22}
+                className="text-amber-400 group-hover:text-amber-300"
+              />
+              <div className="flex flex-col items-start">
+                <span className="text-base font-medium">Install App</span>
+              </div>
+            </button>
+          )}
         </nav>
 
         {/* Logout Button at Bottom */}

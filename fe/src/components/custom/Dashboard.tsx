@@ -6,19 +6,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   Video,
-  Users,
-  Clock,
-  Heart,
   Sparkles,
   Zap,
   Shuffle,
   Mars,
   Venus,
-  X,
   AlertTriangle,
-  Smile,
   Shield,
-  Volume2,
   Mic,
   Wifi,
 } from "lucide-react";
@@ -29,15 +23,15 @@ type MatchPref = "RANDOM" | "MALE" | "FEMALE";
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
-  const user = useGetUser();
+  const _user = useGetUser();
 
-  const [stats] = useState({
+  const [_stats] = useState({
     strangersConnected: 47,
     timeSpent: "3h 24m",
     likesReceived: 12,
   });
 
-  const [currentTime, setCurrentTime] = useState("");
+  const [_currentTime, setCurrentTime] = useState("");
   const [matchPref, setMatchPref] = useState<MatchPref>("RANDOM");
 
   // Live IST Time

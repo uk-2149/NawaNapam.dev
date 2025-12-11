@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
@@ -8,15 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Toaster } from "@/components/ui/sonner";
-import {
-  User,
-  Mail,
-  Lock,
-  Loader2,
-  ArrowLeft,
-  Globe,
-  Sparkles,
-} from "lucide-react";
+import { User, Mail, Lock, Loader2, ArrowLeft, Sparkles } from "lucide-react";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Pencil, ArrowLeft, Check, Globe } from "lucide-react";
 import { Input } from "@/components/ui/input";

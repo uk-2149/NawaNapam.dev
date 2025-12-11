@@ -460,7 +460,7 @@ export function useSignaling({
       }
       socketRef.current = null;
     };
-  }, [userId, username, genderPreference]);
+  }, [userId, username, gender, genderPreference]);
 
   // ---- start / next / end / teardown ----
   const start = useCallback(() => {
