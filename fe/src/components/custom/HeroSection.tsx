@@ -26,7 +26,7 @@ export default function HeroSection() {
   return (
     <>
       {/* HERO SECTION */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16 w-full">
         {/* Animated Golden-Green Blobs */}
         <div className="absolute inset-0 opacity-30 pointer-events-none">
           <div
@@ -164,7 +164,7 @@ export default function HeroSection() {
       </section>
 
       {/* WHY CHOOSE US */}
-      <section className="py-20 lg:py-28 bg-black/10">
+      <section className="py-20 lg:py-28 bg-black/10 w-full">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-amber-50 mb-6">

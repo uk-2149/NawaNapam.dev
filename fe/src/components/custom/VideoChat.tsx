@@ -41,11 +41,51 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   // refs
-  const selfVideoRef = useRef<HTMLVideoElement | null>(null);
-  const strangerVideoRef = useRef<HTMLVideoElement | null>(null);
+  const selfVideoMobileRef = useRef<HTMLVideoElement | null>(null);
+  const selfVideoDesktopRef = useRef<HTMLVideoElement | null>(null);
+  const strangerVideoMobileRef = useRef<HTMLVideoElement | null>(null);
+  const strangerVideoDesktopRef = useRef<HTMLVideoElement | null>(null);
   const messageEndRef = useRef<HTMLDivElement | null>(null);
   const hasStartedRef = useRef(false);
   const localStreamRef = useRef<MediaStream | null>(null);
+
+  // track current breakpoint so we choose the visible element
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 768px)");
+    const set = () => setIsDesktop(mql.matches);
+    set();
+    mql.addEventListener
+      ? mql.addEventListener("change", set)
+      : mql.addListener(set);
+    return () => {
+      mql.removeEventListener
+        ? mql.removeEventListener("change", set)
+        : mql.removeListener(set);
+    };
+  }, []);
+
+  const getSelfEl = () => {
+    // prefer the element that SHOULD be visible for the current breakpoint
+    const primary = isDesktop
+      ? selfVideoDesktopRef.current
+      : selfVideoMobileRef.current;
+    const fallback = isDesktop
+      ? selfVideoMobileRef.current
+      : selfVideoDesktopRef.current;
+    return primary ?? fallback ?? null;
+  };
+
+  const getRemoteEl = () => {
+    const primary = isDesktop
+      ? strangerVideoDesktopRef.current
+      : strangerVideoMobileRef.current;
+    const fallback = isDesktop
+      ? strangerVideoMobileRef.current
+      : strangerVideoDesktopRef.current;
+    return primary ?? fallback ?? null;
+  };
 
   // auth / router
   const user = useGetUser();
@@ -103,16 +143,18 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
       );
       setUserInteracted(true);
 
-      // Force play all videos
-      if (selfVideoRef.current?.srcObject) {
-        selfVideoRef.current
-          .play()
-          .catch((e) => console.warn("[Mobile] Self video play failed:", e));
+      const selfEl = getSelfEl();
+      const remoteEl = getRemoteEl();
+
+      if (selfEl?.srcObject) {
+        const p = selfEl.play();
+        if (p && typeof p.catch === "function")
+          p.catch((e) => console.warn("[Mobile] Self video play failed:", e));
       }
-      if (strangerVideoRef.current?.srcObject) {
-        strangerVideoRef.current
-          .play()
-          .catch((e) => console.warn("[Mobile] Remote video play failed:", e));
+      if (remoteEl?.srcObject) {
+        const p = remoteEl.play();
+        if (p && typeof p.catch === "function")
+          p.catch((e) => console.warn("[Mobile] Remote video play failed:", e));
       }
     };
 
@@ -130,115 +172,77 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
   }, []);
 
   useEffect(() => {
-    if (!strangerVideoRef.current) return;
+    const el = getRemoteEl();
+    if (!el) return;
 
-    const video = strangerVideoRef.current;
+    // (Re)attach remote sink whenever the target element is (re)mounted
+    if (attachRemote) attachRemote(el);
 
-    const checkStream = () => {
-      const stream = video.srcObject;
-      const hasActiveStream = stream instanceof MediaStream && stream.active;
-      setRemoteStreamReady(hasActiveStream);
-      console.log("[VideoChatPage] Remote stream status:", {
-        hasStream: !!stream,
-        active: hasActiveStream,
-        videoTracks:
-          stream instanceof MediaStream ? stream.getVideoTracks().length : 0,
-      });
-    };
-
-    // Check immediately
-    checkStream();
-
-    // Monitor for stream changes
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (
-          mutation.type === "attributes" &&
-          mutation.attributeName === "srcobject"
-        ) {
-          checkStream();
-
-          // Mobile fix: Force play on stream change
-          if (video.srcObject) {
-            setTimeout(() => {
-              video.play().catch((e) => {
-                console.warn(
-                  "[VideoChatPage] Remote play failed after stream change:",
-                  e
-                );
-              });
-            }, 100);
-          }
-        }
-      });
-    });
-
-    observer.observe(video, {
-      attributes: true,
-      attributeFilter: ["srcObject"],
-    });
-
-    // Listen for metadata loaded (critical for mobile)
-    const onMetadataLoaded = () => {
+    const onMeta = () => {
       console.log("[VideoChatPage] Remote video metadata loaded");
-      checkStream();
-      video.play().catch(() => {});
+      const p = el.play();
+      if (p && typeof p.catch === "function") p.catch(() => {});
     };
 
-    video.addEventListener("loadedmetadata", onMetadataLoaded);
+    el.addEventListener("loadedmetadata", onMeta);
 
-    // Periodic check for mobile (ensures video plays even if events are missed)
-    const interval = setInterval(() => {
-      checkStream();
-
-      // Force play if stream exists but video is paused
-      if (video.srcObject && video.paused && userInteracted) {
-        video.play().catch(() => {});
+    // Periodic nudge helps on iOS when events are missed
+    const id = setInterval(() => {
+      const hasStream =
+        (el as HTMLVideoElement)?.srcObject instanceof MediaStream;
+      setRemoteStreamReady(
+        hasStream && (el?.srcObject as MediaStream).active === true
+      );
+      if (hasStream && (el as HTMLVideoElement).paused && userInteracted) {
+        const p = el.play();
+        if (p && typeof p.catch === "function") p.catch(() => {});
       }
-    }, 1000);
+    }, 800);
 
     return () => {
-      observer.disconnect();
-      video.removeEventListener("loadedmetadata", onMetadataLoaded);
-      clearInterval(interval);
+      el.removeEventListener("loadedmetadata", onMeta);
+      clearInterval(id);
     };
-  }, [userInteracted]);
+    // Re-run when the actual DOM target changes, or user unlocked autoplay.
+  }, [
+    strangerVideoMobileRef.current,
+    strangerVideoDesktopRef.current,
+    attachRemote,
+    isDesktop,
+    userInteracted,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // useEffect(() => {
+  //   if (strangerVideoRef.current && attachRemote) {
+  //     console.log("[VideoChatPage] Attaching remote video element");
+  //     attachRemote(strangerVideoRef.current);
+  //   }
+  // }, [attachRemote]);
 
   useEffect(() => {
-    if (strangerVideoRef.current && attachRemote) {
-      console.log("[VideoChatPage] Attaching remote video element");
-      attachRemote(strangerVideoRef.current);
-    }
-  }, [attachRemote]);
+    if (!connected) return;
+    const el = getRemoteEl();
+    if (!el) return;
 
-  useEffect(() => {
-    if (!connected || !strangerVideoRef.current) return;
+    // ensure the current element is the one wired to the peer
+    if (attachRemote) attachRemote(el);
 
-    console.log(
-      "[VideoChatPage] Connection established, ensuring remote video plays"
-    );
-
-    const video = strangerVideoRef.current;
-
-    // Wait a moment for stream to be ready
-    setTimeout(() => {
-      if (attachRemote) {
-        attachRemote(video);
+    // try play shortly after SRD completes
+    const t = setTimeout(() => {
+      if (el.srcObject) {
+        const p = el.play();
+        if (p && typeof p.catch === "function") p.catch(() => {});
       }
+    }, 300);
 
-      // Force play
-      setTimeout(() => {
-        if (video.srcObject) {
-          video.play().catch((e) => {
-            console.warn(
-              "[VideoChatPage] Remote video play failed after connection:",
-              e
-            );
-          });
-        }
-      }, 300);
-    }, 500);
-  }, [connected, attachRemote]);
+    return () => clearTimeout(t);
+  }, [
+    connected,
+    strangerVideoMobileRef.current,
+    strangerVideoDesktopRef.current,
+    attachRemote,
+    isDesktop,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (sessionStatus === "loading") return;
@@ -276,37 +280,33 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
 
         localStreamRef.current = mediaStream;
         setLocalStreamReady(true);
+
         console.log("[Camera] ✅ Local stream acquired:", {
           videoTracks: mediaStream.getVideoTracks().length,
           audioTracks: mediaStream.getAudioTracks().length,
           videoSettings: mediaStream.getVideoTracks()[0]?.getSettings(),
         });
 
-        // Attach to video element
-        if (selfVideoRef.current) {
-          const video = selfVideoRef.current;
-          video.srcObject = mediaStream;
-          video.muted = true;
-          video.playsInline = true;
-          video.autoplay = true;
+        const el = getSelfEl();
+        if (el) {
+          // **Set attributes BEFORE attaching stream (iOS requirement)**
+          el.muted = true;
+          el.setAttribute("playsinline", "");
+          // attach
+          if (el.srcObject !== mediaStream)
+            (el as HTMLVideoElement).srcObject = mediaStream;
 
-          // Force explicit styles for mobile
-          video.style.width = "100%";
-          video.style.height = "100%";
-          video.style.objectFit = "cover";
+          // play (may be deferred until user interaction on iOS)
+          const p = el.play();
+          if (p && typeof p.catch === "function") p.catch(() => {});
 
-          // Play with error handling
-          setTimeout(() => {
-            video.play().catch((err) => {
-              console.warn("[Camera] Local video autoplay blocked:", err);
-              // Will be played after user interaction
-            });
-          }, 100);
-        }
+          // notify WebRTC
+          if (attachLocal) attachLocal(el);
 
-        // Notify WebRTC hook
-        if (attachLocal && selfVideoRef.current) {
-          attachLocal(selfVideoRef.current);
+          // ensure sizing (if you rely on runtime styles)
+          el.style.width = "100%";
+          el.style.height = "100%";
+          (el.style as CSSStyleDeclaration).objectFit = "cover";
         }
       } catch (err) {
         console.error("[Camera] ❌ Camera access failed:", err);
@@ -315,7 +315,6 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
     };
 
     startLocalStream();
-
     return () => {
       mounted = false;
       console.log("[Camera] Component effect cleanup (stream preserved)");
@@ -323,20 +322,129 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
   }, [userId, sessionStatus, attachLocal]);
 
   useEffect(() => {
-    if (!localStreamReady || !localStreamRef.current) return;
+    const el = getSelfEl();
+    const stream = localStreamRef.current;
+    if (!el || !stream) return;
 
-    if (
-      selfVideoRef.current &&
-      selfVideoRef.current.srcObject !== localStreamRef.current
-    ) {
-      console.log("[VideoChatPage] Re-attaching local stream to self video");
-      selfVideoRef.current.srcObject = localStreamRef.current;
-      selfVideoRef.current.style.width = "100%";
-      selfVideoRef.current.style.height = "100%";
-      selfVideoRef.current.style.objectFit = "cover";
-      selfVideoRef.current.play().catch(() => {});
+    el.muted = true;
+    el.setAttribute("playsinline", "");
+    if (el.srcObject !== stream) (el as HTMLVideoElement).srcObject = stream;
+
+    const p = el.play();
+    if (p && typeof p.catch === "function") p.catch(() => {});
+
+    if (attachLocal) attachLocal(el);
+  }, [
+    selfVideoMobileRef.current,
+    selfVideoDesktopRef.current,
+    localStreamReady,
+    attachLocal,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  //   useEffect(() => {
+  //   const el = getSelfEl();
+  //   const stream = localStreamRef.current;
+
+  //   if (!el) return;
+
+  //   // set autoplay-critical attributes BEFORE attaching stream (iOS)
+  //   el.muted = true;
+  //   el.setAttribute('playsinline', '');
+
+  //   if (stream) {
+  //     if (el.srcObject !== stream) el.srcObject = stream;
+  //     const p = el.play();
+  //     if (p && typeof p.catch === 'function') p.catch(() => {});
+  //   } else {
+  //     try { el.pause(); } catch {}
+  //     (el as any).srcObject = null;
+  //     el.removeAttribute('src');
+  //     try { el.load(); } catch {}
+  //   }
+  // }, [localStreamReady]); // runs when your local stream becomes ready/clears
+
+  // useEffect(() => {
+  //   const el = getSelfEl();
+  //   const stream = localStreamRef.current;
+  //   if (!el || !stream) return;
+  //   if (el.srcObject !== stream) el.srcObject = stream;
+  //   const p = el.play();
+  //   if (p && typeof p.catch === 'function') p.catch(() => {});
+  //   // also wire to WebRTC hook:
+  //   if (attachLocal && el) attachLocal(el);
+  // }, [selfVideoMobileRef.current, selfVideoDesktopRef.current, attachLocal]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // useEffect(() => {
+  //   const el = getRemoteEl();
+  //   if (!el || !attachRemote) return;
+  //   attachRemote(el);
+  //   // attempt play when stream lands
+  //   const tryPlay = () => {
+  //     if (el.srcObject && (el as HTMLVideoElement).paused) {
+  //       const p = (el as HTMLVideoElement).play();
+  //       if (p && typeof p.catch === 'function') p.catch(() => {});
+  //     }
+  //   };
+  //   const id = setInterval(tryPlay, 800);
+  //   return () => clearInterval(id);
+  // }, [strangerVideoMobileRef.current, strangerVideoDesktopRef.current, attachRemote]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function hardResetVideo(el?: HTMLVideoElement | null) {
+    if (!el) return;
+    try {
+      el.pause();
+    } catch {}
+    (el as HTMLVideoElement).srcObject = null;
+    el.removeAttribute("src");
+    try {
+      el.load();
+    } catch {}
+  }
+  function stopStream(stream?: MediaStream | null) {
+    if (!stream) return;
+    for (const t of stream.getTracks()) {
+      try {
+        t.stop();
+      } catch {}
     }
-  }, [localStreamReady]);
+  }
+
+  const handleNext = () => {
+    console.log("[Action] 🔄 User pressed NEXT");
+    clearChat();
+    cleanupRemote();
+    setRemoteStreamReady(false);
+    hasStartedRef.current = false;
+
+    // reset remote elements so stale tracks can't stick around
+    hardResetVideo(getRemoteEl());
+
+    if (status === "matched" && roomId) {
+      setTimeout(() => {
+        next();
+      }, 200);
+    } else {
+      start();
+    }
+    toast.info("Finding next partner...");
+  };
+
+  const handleEnd = () => {
+    console.log("[Action] ⏹️ User pressed END");
+    clearChat();
+    cleanupRemote();
+    setRemoteStreamReady(false);
+    hasStartedRef.current = false;
+    end();
+
+    // fully reset elements (iOS especially)
+    hardResetVideo(getRemoteEl());
+    // hardResetVideo(getSelfEl());
+    // keep camera policy as you prefer; if you want to really turn it off:
+    // stopStream(localStreamRef.current); localStreamRef.current = null; setLocalStreamReady(false);
+
+    toast.info("Chat ended. Your camera is still on.");
+  };
 
   useEffect(() => {
     if (!userId || hasStartedRef.current) return;
@@ -432,34 +540,34 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
     start();
   };
 
-  const handleNext = () => {
-    console.log("[Action] 🔄 User pressed NEXT");
-    clearChat();
-    cleanupRemote();
-    setRemoteStreamReady(false);
-    hasStartedRef.current = false;
+  // const handleNext = () => {
+  //   console.log("[Action] 🔄 User pressed NEXT");
+  //   clearChat();
+  //   cleanupRemote();
+  //   setRemoteStreamReady(false);
+  //   hasStartedRef.current = false;
 
-    if (status === "matched" && roomId) {
-      setTimeout(() => {
-        next();
-      }, 200);
-    } else {
-      start();
-    }
+  //   if (status === "matched" && roomId) {
+  //     setTimeout(() => {
+  //       next();
+  //     }, 200);
+  //   } else {
+  //     start();
+  //   }
 
-    toast.info("Finding next partner...");
-  };
+  //   toast.info("Finding next partner...");
+  // };
 
-  const handleEnd = () => {
-    console.log("[Action] ⏹️ User pressed END");
-    clearChat();
-    cleanupRemote();
-    setRemoteStreamReady(false);
-    hasStartedRef.current = false;
-    end();
+  // const handleEnd = () => {
+  //   console.log("[Action] ⏹️ User pressed END");
+  //   clearChat();
+  //   cleanupRemote();
+  //   setRemoteStreamReady(false);
+  //   hasStartedRef.current = false;
+  //   end();
 
-    toast.info("Chat ended. Your camera is still on.");
-  };
+  //   toast.info("Chat ended. Your camera is still on.");
+  // };
 
   const handleBackToDashboard = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -522,7 +630,7 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
           >
             {/* Remote video - FIXED: Always rendered and visible */}
             <video
-              ref={strangerVideoRef}
+              ref={strangerVideoMobileRef}
               autoPlay
               playsInline
               muted={false}
@@ -581,57 +689,59 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
 
             {/* Self PiP - top right corner like reference image */}
             <div
-              className="absolute md:hidden"
+              className="absolute md:hidden rounded-xl overflow-hidden border-2 border-emerald-500/40 bg-black shadow-2xl"
               style={{
                 top: "80px",
                 right: "12px",
                 zIndex: 50,
                 position: "absolute",
+                width: "100px",
+                height: "140px",
               }}
             >
-              <div
+              {/* <div
                 className="relative rounded-xl overflow-hidden border-2 border-emerald-500/40 bg-black shadow-2xl"
                 style={{
                   width: "100px",
                   height: "140px",
                 }}
-              >
-                <video
-                  ref={selfVideoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  webkit-playsinline="true"
-                  x-webkit-airplay="allow"
-                  className="w-full h-full object-cover"
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
-                  onLoadedMetadata={(e) => {
-                    console.log("[Video] Local metadata loaded");
-                    e.currentTarget.play().catch(() => {});
-                  }}
-                  onCanPlay={(e) => {
-                    console.log("[Video] Local can play");
-                    e.currentTarget.play().catch(() => {});
-                  }}
-                />
-                {/* Video off overlay */}
-                {isVideoOff && (
-                  <div className="absolute inset-0 bg-black/90 flex items-center justify-center">
-                    <VideoOff size={24} className="text-white/60" />
-                  </div>
-                )}
-                {/* Loading indicator if stream not ready */}
-                {!localStreamReady && (
-                  <div className="absolute inset-0 bg-black/90 flex items-center justify-center">
-                    <div className="w-6 h-6 border-2 border-white/40 border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                )}
-              </div>
+              > */}
+              <video
+                ref={selfVideoMobileRef}
+                autoPlay
+                muted
+                playsInline
+                webkit-playsinline="true"
+                x-webkit-airplay="allow"
+                className="w-full h-full object-cover"
+                style={{
+                  display: "block",
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                }}
+                onLoadedMetadata={(e) => {
+                  console.log("[Video] Local metadata loaded");
+                  e.currentTarget.play().catch(() => {});
+                }}
+                onCanPlay={(e) => {
+                  console.log("[Video] Local can play");
+                  e.currentTarget.play().catch(() => {});
+                }}
+              />
+              {/* Video off overlay */}
+              {isVideoOff && (
+                <div className="absolute inset-0 bg-black/90 flex items-center justify-center">
+                  <VideoOff size={24} className="text-white/60" />
+                </div>
+              )}
+              {/* Loading indicator if stream not ready */}
+              {!localStreamReady && (
+                <div className="absolute inset-0 bg-black/90 flex items-center justify-center">
+                  <div className="w-6 h-6 border-2 border-white/40 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              )}
+              {/* </div> */}
             </div>
           </div>
 
@@ -658,7 +768,7 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
                 )}
 
                 <video
-                  ref={strangerVideoRef}
+                  ref={strangerVideoDesktopRef}
                   autoPlay
                   playsInline
                   muted={false}
@@ -687,7 +797,7 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
                 {/* Self PiP on Desktop - bottom right */}
                 <div className="absolute bottom-4 right-4 w-48 h-36 rounded-xl overflow-hidden border-2 border-emerald-500/40 bg-black shadow-2xl z-30">
                   <video
-                    ref={selfVideoRef}
+                    ref={selfVideoDesktopRef}
                     autoPlay
                     muted
                     playsInline
