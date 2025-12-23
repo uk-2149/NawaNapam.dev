@@ -766,19 +766,46 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
             </div>
 
             {/* Overlays - FIXED z-index and visibility logic */}
-            {showSearching && (
-              <div
-                className="absolute inset-0 bg-gradient-to-br from-emerald-900/50 via-slate-900/80 to-amber-900/50 backdrop-blur-sm flex flex-col items-center justify-center gap-4"
-                style={{ zIndex: 20, pointerEvents: "none" }}
-              >
-                <div className="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-sm text-white/90 font-medium">
-                  Finding someone for you...
-                </p>
-              </div>
-            )}
+            {/* Show 'Finding someone for you...' in remote stream position (based on swap state) */}
+            {(showSearching || (isFullyConnected && !remoteStreamReady)) &&
+              !isStreamSwapped && (
+                <div
+                  className="absolute inset-0 bg-gradient-to-br from-emerald-900/50 via-slate-900/80 to-amber-900/50 backdrop-blur-sm flex flex-col items-center justify-center gap-4"
+                  style={{ zIndex: 20, pointerEvents: "none" }}
+                >
+                  <div className="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-sm text-white/90 font-medium">
+                    {showSearching
+                      ? "Finding someone for you..."
+                      : "Waiting for video..."}
+                  </p>
+                </div>
+              )}
 
-            {showConnecting && (
+            {/* Show in PiP position when streams are swapped */}
+            {(showSearching || (isFullyConnected && !remoteStreamReady)) &&
+              isStreamSwapped && (
+                <div
+                  className="absolute bg-gradient-to-br from-emerald-900/50 via-slate-900/80 to-amber-900/50 backdrop-blur-sm flex flex-col items-center justify-center gap-2"
+                  style={{
+                    top: "80px",
+                    right: "12px",
+                    width: "100px",
+                    height: "140px",
+                    zIndex: 55,
+                    pointerEvents: "none",
+                    borderRadius: "12px",
+                  }}
+                >
+                  <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-[9px] text-white/90 font-medium text-center px-1">
+                    {showSearching ? "Finding..." : "Waiting..."}
+                  </p>
+                </div>
+              )}
+
+            {/* Show Connecting in remote stream position (based on swap state) */}
+            {showConnecting && !isStreamSwapped && (
               <div
                 className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-3"
                 style={{ zIndex: 20, pointerEvents: "none" }}
@@ -788,14 +815,24 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
               </div>
             )}
 
-            {/* No stream placeholder - only show when remote is in main view and not connected */}
-            {isFullyConnected && !remoteStreamReady && !isStreamSwapped && (
+            {/* Show Connecting in PiP position when streams are swapped */}
+            {showConnecting && isStreamSwapped && (
               <div
-                className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-3"
-                style={{ zIndex: 15, pointerEvents: "none" }}
+                className="absolute bg-black/70 flex flex-col items-center justify-center gap-2"
+                style={{
+                  top: "80px",
+                  right: "12px",
+                  width: "100px",
+                  height: "140px",
+                  zIndex: 55,
+                  pointerEvents: "none",
+                  borderRadius: "12px",
+                }}
               >
-                <VideoOff size={48} className="text-white/40" />
-                <p className="text-xs text-white/60">Waiting for video...</p>
+                <div className="w-6 h-6 border-2 border-white/40 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-[9px] text-white/70 text-center px-1">
+                  Connecting…
+                </p>
               </div>
             )}
 
@@ -819,19 +856,67 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
           <div className="col-span-9 h-full w-full overflow-hidden">
             {/* Main video container */}
             <div className="relative rounded-2xl overflow-hidden bg-black border border-emerald-500/20 shadow-2xl h-full w-full">
-              {showSearching && (
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/50 via-slate-900/80 to-amber-900/50 backdrop-blur-sm flex flex-col items-center justify-center gap-4 z-20">
-                  <div className="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-sm text-white/90 font-medium">
-                    Finding someone for you...
-                  </p>
-                </div>
-              )}
+              {/* Show 'Finding someone for you...' in remote stream position (based on swap state) */}
+              {(showSearching || (isFullyConnected && !remoteStreamReady)) &&
+                !isStreamSwapped && (
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/50 via-slate-900/80 to-amber-900/50 backdrop-blur-sm flex flex-col items-center justify-center gap-4 z-20">
+                    <div className="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-sm text-white/90 font-medium">
+                      {showSearching
+                        ? "Finding someone for you..."
+                        : "Waiting for video..."}
+                    </p>
+                  </div>
+                )}
 
-              {showConnecting && (
+              {/* Show in PiP position when streams are swapped */}
+              {(showSearching || (isFullyConnected && !remoteStreamReady)) &&
+                isStreamSwapped && (
+                  <div
+                    className="absolute bg-gradient-to-br from-emerald-900/50 via-slate-900/80 to-amber-900/50 backdrop-blur-sm flex flex-col items-center justify-center gap-2"
+                    style={{
+                      bottom: "16px",
+                      right: "16px",
+                      width: "192px",
+                      height: "144px",
+                      zIndex: 35,
+                      pointerEvents: "none",
+                      borderRadius: "12px",
+                    }}
+                  >
+                    <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-xs text-white/90 font-medium text-center px-2">
+                      {showSearching ? "Finding..." : "Waiting..."}
+                    </p>
+                  </div>
+                )}
+
+              {/* Show Connecting in remote stream position (based on swap state) */}
+              {showConnecting && !isStreamSwapped && (
                 <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-3 z-20">
                   <div className="w-10 h-10 border-4 border-white/40 border-t-transparent rounded-full animate-spin"></div>
                   <p className="text-xs text-white/70">Connecting…</p>
+                </div>
+              )}
+
+              {/* Show Connecting in PiP position when streams are swapped */}
+              {showConnecting && isStreamSwapped && (
+                <div
+                  className="absolute bg-black/70 flex flex-col items-center justify-center gap-2"
+                  style={{
+                    bottom: "16px",
+                    right: "16px",
+                    width: "192px",
+                    height: "144px",
+                    zIndex: 35,
+                    pointerEvents: "none",
+                    borderRadius: "12px",
+                  }}
+                >
+                  <div className="w-8 h-8 border-2 border-white/40 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-xs text-white/70 text-center px-2">
+                    Connecting…
+                  </p>
                 </div>
               )}
 
@@ -874,15 +959,6 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
                   x-webkit-airplay="allow"
                   webkit-playsinline="true"
                 />
-                {/* Remote video not ready overlay */}
-                {isFullyConnected && !remoteStreamReady && !isStreamSwapped && (
-                  <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-3 z-10">
-                    <VideoOff size={48} className="text-white/40" />
-                    <p className="text-xs text-white/60">
-                      Waiting for video...
-                    </p>
-                  </div>
-                )}
                 {/* Label when remote is in PiP */}
                 {isStreamSwapped && (
                   <div className="absolute bottom-2 left-2 text-white bg-black/60 backdrop-blur-md px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 border border-emerald-500/30">

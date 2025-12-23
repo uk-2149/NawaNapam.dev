@@ -78,7 +78,7 @@ export default function HeroSection() {
 
             {/* Heading */}
             <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-amber-50 leading-tight">
-              Meet Strangers
+              NAWA JURI GATE
             </h1>
             <h2 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extralight text-amber-100 tracking-wider -mt-7">
               <span className="bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-300 bg-clip-text text-transparent font-bold">
