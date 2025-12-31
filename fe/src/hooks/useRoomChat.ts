@@ -22,9 +22,9 @@ function reducer(state: RoomChatState, action: RoomChatAction): RoomChatState {
   switch (action.type) {
     case "PUSH":
       // Prevent duplicate messages
-      const exists = state.messages.find(m => m.id === action.payload.id);
+      const exists = state.messages.find((m) => m.id === action.payload.id);
       if (exists) {
-        console.log("[RoomChat] Duplicate message ignored:", action.payload.id);
+        // console.log("[RoomChat] Duplicate message ignored:", action.payload.id);
         return state;
       }
       return { ...state, messages: [...state.messages, action.payload] };
@@ -63,16 +63,21 @@ export function useRoomChat({
   // Log after messages change
   useEffect(() => {
     if (state.messages.length === 0) {
-      console.log("[RoomChat] messages cleared; length=0");
+      // console.log("[RoomChat] messages cleared; length=0");
     } else {
       const last = state.messages[state.messages.length - 1];
-      console.log("[RoomChat] message appended; length=", state.messages.length, "last=", last);
+      // console.log(
+      //   "[RoomChat] message appended; length=",
+      //   state.messages.length,
+      //   "last=",
+      //   last
+      // );
     }
   }, [state.messages]);
 
   // FIXED: Reset on room change and clear processed IDs
   useEffect(() => {
-    console.log("[RoomChat] room changed → reset messages; roomId=", roomId);
+    // console.log("[RoomChat] room changed → reset messages; roomId=", roomId);
     dispatch({ type: "RESET" });
     hasJoinedRoom.current = null;
     processedMessageIds.current.clear();
@@ -81,15 +86,15 @@ export function useRoomChat({
   // FIXED: Join room when roomId is available - only once per room
   useEffect(() => {
     if (!socket || !roomId || hasJoinedRoom.current === roomId) return;
-    
-    console.log("[RoomChat] Joining room via socket:", roomId);
+
+    // console.log("[RoomChat] Joining room via socket:", roomId);
     socket.emit("room:join", { roomId });
     hasJoinedRoom.current = roomId;
-    
+
     // Add a small delay and verify we're in the room
     setTimeout(() => {
       if (socket.connected && roomRef.current === roomId) {
-        console.log("[RoomChat] Verifying room membership for:", roomId);
+        // console.log("[RoomChat] Verifying room membership for:", roomId);
         // Optionally re-emit if needed
       }
     }, 100);
@@ -98,36 +103,59 @@ export function useRoomChat({
   // Attach/detach socket listeners
   useEffect(() => {
     if (!socket) {
-      console.log("[RoomChat] no socket; listeners not attached");
+      // console.log("[RoomChat] no socket; listeners not attached");
       return;
     }
 
     sockIdRef.current = (socket as Socket).id ?? null;
-    console.log("[RoomChat] attaching listeners; socketId=", sockIdRef.current, "roomId=", roomRef.current);
+    // console.log(
+    //   "[RoomChat] attaching listeners; socketId=",
+    //   sockIdRef.current,
+    //   "roomId=",
+    //   roomRef.current
+    // );
 
-    const onIncoming = (payload: { from?: string; text: string; ts?: number; roomId?: string }) => {
+    const onIncoming = (payload: {
+      from?: string;
+      text: string;
+      ts?: number;
+      roomId?: string;
+    }) => {
       // Guard wrong room if provided
-      if (payload.roomId && roomRef.current && payload.roomId !== roomRef.current) {
-        console.log("[RoomChat] recv ignored (wrong room)", "expected=", roomRef.current, "got=", payload.roomId);
+      if (
+        payload.roomId &&
+        roomRef.current &&
+        payload.roomId !== roomRef.current
+      ) {
+        // console.log(
+        //   "[RoomChat] recv ignored (wrong room)",
+        //   "expected=",
+        //   roomRef.current,
+        //   "got=",
+        //   payload.roomId
+        // );
         return;
       }
       if (!roomRef.current) {
-        console.log("[RoomChat] recv dropped (roomRef is null); payload=", payload);
+        // console.log(
+        //   "[RoomChat] recv dropped (roomRef is null); payload=",
+        //   payload
+        // );
         return;
       }
 
       const ts = payload.ts || Date.now();
       const from = payload.from || "unknown";
-      
+
       // FIXED: Create unique message ID and check for duplicates
       const msgId = `${from}_${ts}_${payload.text.substring(0, 20)}`;
       if (processedMessageIds.current.has(msgId)) {
-        console.log("[RoomChat] Duplicate message detected, skipping:", msgId);
+        // console.log("[RoomChat] Duplicate message detected, skipping:", msgId);
         return;
       }
-      
+
       processedMessageIds.current.add(msgId);
-      
+
       // Clean up old message IDs (keep last 100)
       if (processedMessageIds.current.size > 100) {
         const arr = Array.from(processedMessageIds.current);
@@ -138,7 +166,14 @@ export function useRoomChat({
         payload.from === selfUserIdRef.current ||
         payload.from === selfUsernameRef.current;
 
-      console.log("[RoomChat] recv chat:message; from=", payload.from, "text=", payload.text, "isSelf=", isSelf);
+      // console.log(
+      //   "[RoomChat] recv chat:message; from=",
+      //   payload.from,
+      //   "text=",
+      //   payload.text,
+      //   "isSelf=",
+      //   isSelf
+      // );
 
       dispatch({
         type: "PUSH",
@@ -154,15 +189,25 @@ export function useRoomChat({
 
     const onSystem = (payload: { text?: string; roomId?: string }) => {
       const text = payload?.text || "";
-      if (payload.roomId && roomRef.current && payload.roomId !== roomRef.current) {
-        console.log("[RoomChat] system ignored (wrong room)", "expected=", roomRef.current, "got=", payload.roomId);
+      if (
+        payload.roomId &&
+        roomRef.current &&
+        payload.roomId !== roomRef.current
+      ) {
+        // console.log(
+        //   "[RoomChat] system ignored (wrong room)",
+        //   "expected=",
+        //   roomRef.current,
+        //   "got=",
+        //   payload.roomId
+        // );
         return;
       }
 
-      console.log("[RoomChat] recv chat:system; text=", text);
+      // console.log("[RoomChat] recv chat:system; text=", text);
 
       const msgId = `sys_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      
+
       dispatch({
         type: "PUSH",
         payload: {
@@ -178,7 +223,7 @@ export function useRoomChat({
     socket.on("chat:system", onSystem);
 
     return () => {
-      console.log("[RoomChat] detaching listeners");
+      // console.log("[RoomChat] detaching listeners");
       socket.off("chat:message", onIncoming);
       socket.off("chat:system", onSystem);
     };
@@ -188,37 +233,42 @@ export function useRoomChat({
   const send = useCallback(
     (text: string) => {
       if (!socket) {
-        console.log("[RoomChat] send aborted: no socket");
+        // console.log("[RoomChat] send aborted: no socket");
         return false;
       }
       if (!roomRef.current) {
-        console.log("[RoomChat] send aborted: no roomId");
+        // console.log("[RoomChat] send aborted: no roomId");
         return false;
       }
 
       const trimmed = text.trim();
       if (!trimmed) {
-        console.log("[RoomChat] send ignored: blank text");
+        // console.log("[RoomChat] send ignored: blank text");
         return false;
       }
 
-      console.log("[RoomChat] send chat:send; roomId=", roomRef.current, "text=", trimmed);
+      // console.log(
+      //   "[RoomChat] send chat:send; roomId=",
+      //   roomRef.current,
+      //   "text=",
+      //   trimmed
+      // );
 
       // FIXED: Emit with proper payload structure
-      socket.emit("chat:send", { 
-        roomId: roomRef.current, 
+      socket.emit("chat:send", {
+        roomId: roomRef.current,
         text: trimmed,
         from: selfUserIdRef.current,
-        username: selfUsernameRef.current
+        username: selfUsernameRef.current,
       });
-      
+
       return true;
     },
     [socket]
   );
 
   const reset = useCallback(() => {
-    console.log("[RoomChat] manual reset()");
+    // console.log("[RoomChat] manual reset()");
     dispatch({ type: "RESET" });
     hasJoinedRoom.current = null;
     processedMessageIds.current.clear();

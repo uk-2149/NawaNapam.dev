@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     // generate 6 digit OTP
     const res = await sendOtpEmail(email);
 
-    console.log(res);
+    // console.log(res);
 
     const otpkey = `reset-pass-otp-${email}`;
 

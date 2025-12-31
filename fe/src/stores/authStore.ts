@@ -84,6 +84,7 @@ export const syncAuthWithSession = (session: { user?: User } | null) => {
 useAuthStore.subscribe(
   (state) => state.isAuthenticated,
   (isAuthenticated) => {
-    console.log("Auth state changed:", isAuthenticated);
+    // console.log("Auth state changed:", isAuthenticated);
+    return;
   }
 );

@@ -21,14 +21,14 @@ type Action =
 
 // ---- Reducer ----
 function reducer(state: State, action: Action): State {
-  console.log(
-    "%c[useSignaling → reducer]",
-    "color: #8ef; font-weight: bold",
-    "Action:",
-    action,
-    "Prev State:",
-    state
-  );
+  // console.log(
+  //   "%c[useSignaling → reducer]",
+  //   "color: #8ef; font-weight: bold",
+  //   "Action:",
+  //   action,
+  //   "Prev State:",
+  //   state
+  // );
 
   switch (action.type) {
     case "SET_STATUS":
@@ -78,11 +78,11 @@ let lastMatchRequestAt = 0;
 
 // ---- Utility for colored logs ----
 function log(prefix: string, ...args: unknown[]) {
-  console.log(
-    `%c[Signaling:${prefix}]`,
-    "color: #ffb100; font-weight: bold",
-    ...args
-  );
+  // console.log(
+  //   `%c[Signaling:${prefix}]`,
+  //   "color: #ffb100; font-weight: bold",
+  //   ...args
+  // );
 }
 
 function normPref(p?: string | null) {
@@ -167,7 +167,7 @@ export function startMatch(genderPref?: string) {
 
   lastMatchRequestAt = now;
   log("match", "Emitting → match:request", { pref });
-  socket.emit("match:request", { pref });;
+  socket.emit("match:request", { pref });
   return true;
 }
 
@@ -387,14 +387,17 @@ export function useSignaling({
       }
 
       if (retryTimerRef.current) return;
-      retryTimerRef.current = setTimeout(() => {
-        retryTimerRef.current = null;
-        if (statusRef.current !== "matched") {
-          const ok = startMatch(genderPreference);
-          log("match:queued", "Re-emitted match request → ok?", ok);
-          if (!ok) socketRef.current?.emit("match:request");
-        }
-      }, 300 + Math.floor(Math.random() * 500));
+      retryTimerRef.current = setTimeout(
+        () => {
+          retryTimerRef.current = null;
+          if (statusRef.current !== "matched") {
+            const ok = startMatch(genderPreference);
+            log("match:queued", "Re-emitted match request → ok?", ok);
+            if (!ok) socketRef.current?.emit("match:request");
+          }
+        },
+        300 + Math.floor(Math.random() * 500)
+      );
     };
     s.on("match:queued", onQueued);
     cleanupFns.push(() => s.off("match:queued", onQueued));

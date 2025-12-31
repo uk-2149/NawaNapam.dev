@@ -70,7 +70,7 @@ export const authOptions: NextAuthOptions = {
       if (user.email) {
         try {
           await sendWelcomeEmail(user.email);
-          console.log(`Welcome email sent to: ${user.email}`);
+          // console.log(`Welcome email sent to: ${user.email}`);
         } catch (error) {
           console.error(
             `Failed to send welcome email to ${user.email}:`,
@@ -121,9 +121,9 @@ export const authOptions: NextAuthOptions = {
                   session_state: account.session_state,
                 },
               });
-              console.log(
-                `[Auth] Linked ${account.provider} account to existing user: ${user.email}`
-              );
+              // console.log(
+              //   `[Auth] Linked ${account.provider} account to existing user: ${user.email}`
+              // );
             }
           }
 
