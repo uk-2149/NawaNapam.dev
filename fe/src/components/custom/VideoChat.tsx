@@ -52,6 +52,7 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
     originY: number;
     dragging: boolean;
   } | null>(null);
+  const swapDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // refs
   const selfVideoMobileRef = useRef<HTMLVideoElement | null>(null);
@@ -107,7 +108,7 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
   const { status: sessionStatus, data: session } = useSession();
   const router = useRouter();
 
-  // console.log("[VideoChatPage] User data:", { userId, username, user });
+  console.log("[VideoChatPage] User data:", { userId, username, user });
 
   // signaling
   const { status, peer, roomId, start, next, end, socket } = useSignaling(
@@ -152,9 +153,9 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
 
   useEffect(() => {
     const enablePlayback = () => {
-      //  console.log(
-      //   "[Mobile] 📱 User interaction detected - enabling video playback"
-      // );
+      console.log(
+        "[Mobile] 📱 User interaction detected - enabling video playback"
+      );
       setUserInteracted(true);
 
       const selfEl = getSelfEl();
@@ -185,11 +186,9 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
       once: true,
       passive: true,
     });
-    document.addEventListener("click", enablePlayback, { once: true });
 
     return () => {
       document.removeEventListener("touchstart", enablePlayback);
-      document.removeEventListener("click", enablePlayback);
     };
   }, []);
 
@@ -201,7 +200,7 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
     if (attachRemote) attachRemote(el);
 
     const onMeta = () => {
-      // console.log("[VideoChatPage] Remote video metadata loaded");
+      console.log("[VideoChatPage] Remote video metadata loaded");
       const p = el.play();
       if (p && typeof p.catch === "function") p.catch(() => {});
     };
@@ -280,7 +279,7 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
 
     const startLocalStream = async () => {
       try {
-        // console.log("[Camera] 📹 Requesting local media...");
+        console.log("[Camera] 📹 Requesting local media...");
         const mediaStream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: "user",
@@ -303,11 +302,11 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
         localStreamRef.current = mediaStream;
         setLocalStreamReady(true);
 
-        // console.log("[Camera] ✅ Local stream acquired:", {
-        //   videoTracks: mediaStream.getVideoTracks().length,
-        //   audioTracks: mediaStream.getAudioTracks().length,
-        //   videoSettings: mediaStream.getVideoTracks()[0]?.getSettings(),
-        // });
+        console.log("[Camera] ✅ Local stream acquired:", {
+          videoTracks: mediaStream.getVideoTracks().length,
+          audioTracks: mediaStream.getAudioTracks().length,
+          videoSettings: mediaStream.getVideoTracks()[0]?.getSettings(),
+        });
 
         const el = getSelfEl();
         if (el) {
@@ -339,7 +338,7 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
     startLocalStream();
     return () => {
       mounted = false;
-      // console.log("[Camera] Component effect cleanup (stream preserved)");
+      console.log("[Camera] Component effect cleanup (stream preserved)");
     };
   }, [userId, sessionStatus, attachLocal]);
 
@@ -432,7 +431,7 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
   }
 
   const handleNext = () => {
-    // console.log("[Action] 🔄 User pressed NEXT");
+    console.log("[Action] 🔄 User pressed NEXT");
     clearChat();
     cleanupRemote();
     setRemoteStreamReady(false);
@@ -452,7 +451,7 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
   };
 
   const handleEnd = () => {
-    // console.log("[Action] ⏹️ User pressed END");
+    console.log("[Action] ⏹️ User pressed END");
     clearChat();
     cleanupRemote();
     setRemoteStreamReady(false);
@@ -469,8 +468,17 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
   };
 
   const handleSwapStreams = () => {
-    // console.log("[Action] 🔄 Swapping video streams");
-    setIsStreamSwapped((prev) => !prev);
+    console.log("[Action] 🔄 Swapping video streams");
+    
+    // Debounce swap to prevent rapid toggling
+    if (swapDebounceRef.current) {
+      clearTimeout(swapDebounceRef.current);
+    }
+    
+    swapDebounceRef.current = setTimeout(() => {
+      setIsStreamSwapped((prev) => !prev);
+      swapDebounceRef.current = null;
+    }, 50); // 50ms debounce to prevent multiple swaps from simultaneous events
   };
 
   const switchCamera = async () => {
@@ -524,7 +532,7 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
         attachLocal(el);
       }
 
-      // console.log("[Camera] 🔄 Switched to:", nextFacing);
+      console.log("[Camera] 🔄 Switched to:", nextFacing);
     } catch (err) {
       console.error("[Camera] Switch failed:", err);
       toast.error("Unable to switch camera");
@@ -578,7 +586,7 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
 
   useEffect(() => {
     const stopTracks = () => {
-      // console.log("[Camera] 🛑 Stopping local tracks (page unload)");
+      console.log("[Camera] 🛑 Stopping local tracks (page unload)");
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
     };
@@ -594,15 +602,15 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-    // console.log("[Device] 📱 Mobile:", isMobile);
-    // console.log("[Device] 🍎 iOS:", isIOS);
-    // console.log(
-    //   "[Device] 📏 Viewport:",
-    //   window.innerWidth,
-    //   "x",
-    //   window.innerHeight
-    // );
-    // console.log("[Device] 🌐 User Agent:", navigator.userAgent);
+    console.log("[Device] 📱 Mobile:", isMobile);
+    console.log("[Device] 🍎 iOS:", isIOS);
+    console.log(
+      "[Device] 📏 Viewport:",
+      window.innerWidth,
+      "x",
+      window.innerHeight
+    );
+    console.log("[Device] 🌐 User Agent:", navigator.userAgent);
   }, []);
 
   const sendMessage = (e: React.FormEvent) => {
@@ -675,43 +683,58 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
   const showConnecting = status === "matched" && !connected;
   const isFullyConnected = status === "matched" && connected;
 
-  const onSelfPointerDown = (e: React.PointerEvent) => {
-    // Only allow dragging when self video is in PiP mode (not fullscreen)
-    if (isStreamSwapped) return;
+const DRAG_THRESHOLD = 6;
 
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+const onSelfPointerDown = (e: React.PointerEvent) => {
+  e.preventDefault();
+  e.currentTarget.setPointerCapture(e.pointerId);
 
-    dragRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      originX: selfPos.x,
-      originY: selfPos.y,
-      dragging: true,
-    };
+  dragRef.current = {
+    startX: e.clientX,
+    startY: e.clientY,
+    originX: selfPos.x,
+    originY: selfPos.y,
+    dragging: false,
   };
+};
 
-  const onSelfPointerMove = (e: React.PointerEvent) => {
-    if (!dragRef.current?.dragging) return;
+const onSelfPointerMove = (e: React.PointerEvent) => {
+  if (!dragRef.current) return;
 
-    const dx = e.clientX - dragRef.current.startX;
-    const dy = e.clientY - dragRef.current.startY;
+  const dx = e.clientX - dragRef.current.startX;
+  const dy = e.clientY - dragRef.current.startY;
 
+  if (!dragRef.current.dragging) {
+    const dist = Math.hypot(dx, dy);
+    if (dist > DRAG_THRESHOLD) {
+      dragRef.current.dragging = true;
+    }
+  }
+
+  if (dragRef.current.dragging) {
     setSelfPos({
       x: dragRef.current.originX + dx,
       y: dragRef.current.originY + dy,
     });
-  };
+  }
+};
 
-  const onSelfPointerUp = (e: React.PointerEvent) => {
-    if (!dragRef.current) return;
+const onSelfPointerUp = (e: React.PointerEvent) => {
+  const wasDragging = dragRef.current?.dragging;
 
-    dragRef.current.dragging = false;
-    dragRef.current = null;
+  try {
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  } catch {}
 
-    try {
-      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {}
-  };
+  dragRef.current = null;
+
+  // ✅ TAP (not drag) → swap
+  if (!wasDragging) {
+    e.stopPropagation();
+    handleSwapStreams();
+  }
+};
+
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-emerald-950 via-slate-950 to-amber-950 flex flex-col font-sans">
@@ -753,9 +776,13 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
           >
             {/* Remote video - positioned based on swap state */}
             <div
-              onDoubleClick={handleSwapStreams}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSwapStreams();
+              }}
               className="cursor-pointer"
               style={{
+                touchAction: "none",
                 position: "absolute",
                 ...(isStreamSwapped
                   ? {
@@ -793,10 +820,10 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
                     : "none",
                 }}
                 onLoadedMetadata={(e) => {
-                  // console.log("[Video] Remote metadata loaded");
+                  console.log("[Video] Remote metadata loaded");
                   if (e.currentTarget.paused) {
                     e.currentTarget.play().catch((err) => {
-                      // console.log("[Video] Remote play failed:", err.name);
+                      console.log("[Video] Remote play failed:", err.name);
                     });
                   }
                 }}
@@ -809,9 +836,11 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
               onPointerMove={onSelfPointerMove}
               onPointerUp={onSelfPointerUp}
               onPointerCancel={onSelfPointerUp}
-              onDoubleClick={handleSwapStreams}
+              // onClick={handleSwapStreams}
               className="cursor-pointer"
               style={{
+                touchAction: "none",
+                userSelect: "none",
                 position: "absolute",
                 ...(isStreamSwapped
                   ? {
@@ -850,10 +879,10 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
                   transform: "scaleX(-1)",
                 }}
                 onLoadedMetadata={(e) => {
-                  // console.log("[Video] Local metadata loaded");
+                  console.log("[Video] Local metadata loaded");
                   if (e.currentTarget.paused) {
                     e.currentTarget.play().catch((err) => {
-                      // console.log("[Video] Local play failed:", err.name);
+                      console.log("[Video] Local play failed:", err.name);
                     });
                   }
                 }}
@@ -1035,7 +1064,10 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
 
               {/* Remote video - main or PiP based on swap */}
               <div
-                onDoubleClick={handleSwapStreams}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSwapStreams();
+                }}
                 className="cursor-pointer"
                 style={{
                   position: "absolute",
@@ -1086,9 +1118,10 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
                 onPointerMove={onSelfPointerMove}
                 onPointerUp={onSelfPointerUp}
                 onPointerCancel={onSelfPointerUp}
-                onDoubleClick={handleSwapStreams}
                 className="cursor-pointer hover:border-emerald-400/60 transition-all"
                 style={{
+                  touchAction: "none",
+                  userSelect: "none",
                   position: "absolute",
                   ...(isStreamSwapped
                     ? {
@@ -1636,3 +1669,4 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
     </div>
   );
 }
+
