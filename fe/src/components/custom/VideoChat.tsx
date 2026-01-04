@@ -460,11 +460,19 @@ export default function VideoChatPage({ gender }: VideoChatPageProps) {
 
     // fully reset elements (iOS especially)
     hardResetVideo(getRemoteEl());
-    // hardResetVideo(getSelfEl());
-    // keep camera policy as you prefer; if you want to really turn it off:
-    // stopStream(localStreamRef.current); localStreamRef.current = null; setLocalStreamReady(false);
+    hardResetVideo(getSelfEl());
 
-    toast.info("Chat ended. Your camera is still on.");
+    // Stop all tracks (both video and audio)
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+    }
+    setLocalStreamReady(false);
+    setIsVideoOff(false);
+    setIsMuted(false);
+    router.push("/dashboard");
+
+    toast.info("Chat ended.");
   };
 
   const handleSwapStreams = () => {

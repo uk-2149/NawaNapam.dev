@@ -111,7 +111,7 @@ export default function SignupPage() {
         </Link>
       </div>
 
-      <Card className="relative z-10 w-full max-w-md bg-white/8 backdrop-blur-2xl border border-amber-500/30 rounded-xl shadow-2xl shadow-amber-500/20 p-8 mt-0 md:mt-12">
+      <Card className="relative z-10 w-full max-w-md bg-white/8 backdrop-blur-2xl border border-amber-500/30 rounded-xl shadow-2xl shadow-amber-500/20 p-6 mt-0 md:mt-12">
         <div className="text-center mb-10">
           <h1
             className="text-4xl font-black tracking-tight"

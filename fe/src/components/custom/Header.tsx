@@ -145,9 +145,9 @@ export default function Header() {
                         className="object-cover"
                       />
                     </div>
-                    <span className="text-sm font-medium text-amber-100">
+                    {/* <span className="text-sm font-medium text-amber-100">
                       {user.username || user.name?.split(" ")[0] || "Not set"}
-                    </span>
+                    </span> */}
                   </button>
 
                   {/* Desktop Dropdown */}

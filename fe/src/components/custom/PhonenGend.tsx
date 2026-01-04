@@ -89,7 +89,7 @@ export default function CompleteProfile() {
             </Label>
             <div className="flex gap-2">
               <Select value={countryCode} onValueChange={setCountryCode}>
-                <SelectTrigger className="w-20 sm:w-24 h-10 sm:h-11 bg-white/10 border-amber-500/30 text-amber-200 focus:border-amber-400 focus:ring-amber-400/20 rounded-lg flex items-center">
+                <SelectTrigger className="w-20 sm:w-24 h-9 sm:h-9 bg-white/10 border-amber-500/30 text-amber-200 focus:border-amber-400 focus:ring-amber-400/20 rounded-lg flex items-center">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -103,7 +103,7 @@ export default function CompleteProfile() {
                 placeholder="1234567890"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                className="flex-1 h-10 sm:h-11 bg-white/10 border-amber-500/30 text-amber-50 placeholder-amber-200/50 focus:border-amber-400 focus:ring-amber-400/20 rounded-lg"
+                className="flex-1 h-8 sm:h-9 bg-white/10 border-amber-500/30 text-amber-50 placeholder-amber-200/50 focus:border-amber-400 focus:ring-amber-400/20 rounded-lg"
               />
             </div>
           </div>
