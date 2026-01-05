@@ -6,12 +6,13 @@ const VALID_PREFS = new Set(["random", "male", "female"]);
 
 export type GenderFilter = "random" | "male" | "female";
 
-export default function Chat({
+export default async function Chat({
   searchParams,
 }: {
-  searchParams: { pref?: string };
+  searchParams: Promise<{ pref?: string }>;
 }) {
-  const normalized = (searchParams.pref ?? "").toLowerCase();
+  const params = await searchParams;
+  const normalized = (params.pref ?? "").toLowerCase();
 
   if (!normalized || !VALID_PREFS.has(normalized)) {
     return (

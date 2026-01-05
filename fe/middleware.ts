@@ -1,20 +1,45 @@
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { pageRateLimiter, getClientIdentifier } from "@/lib/rate-limit";
 
 export default withAuth(
-  function middleware(req) {
+  async function middleware(req: NextRequest) {
     const token = req.nextauth.token;
     const isAuthPage =
       req.nextUrl.pathname.startsWith("/login") ||
       req.nextUrl.pathname.startsWith("/signup") ||
       req.nextUrl.pathname.startsWith("/complete-profile");
 
+    // Apply rate limiting
+    const identifier = getClientIdentifier(req);
+    const { success, limit, remaining, reset } =
+      await pageRateLimiter.limit(identifier);
+
+    if (!success) {
+      return new NextResponse("Too Many Requests", {
+        status: 429,
+        headers: {
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+          "X-RateLimit-Reset": reset.toString(),
+          "Retry-After": Math.ceil((reset - Date.now()) / 1000).toString(),
+        },
+      });
+    }
+
+    // Add rate limit headers to all responses
+    const response = NextResponse.next();
+    response.headers.set("X-RateLimit-Limit", limit.toString());
+    response.headers.set("X-RateLimit-Remaining", remaining.toString());
+    response.headers.set("X-RateLimit-Reset", reset.toString());
+
     // Redirect authenticated users away from auth pages
     if (isAuthPage && token) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 
-    return NextResponse.next();
+    return response;
   },
   {
     callbacks: {

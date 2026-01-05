@@ -1,20 +1,41 @@
 import { sendWelcomeEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
+import { authRateLimiter, getClientIdentifier } from "@/lib/rate-limit";
+import { signupValidation } from "@/lib/security";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { email, password, username } = body;
+    // Apply rate limiting
+    const identifier = getClientIdentifier(req);
+    const { success, limit, remaining, reset } =
+      await authRateLimiter.limit(identifier);
 
-    // Basic validation
-    if (!email || !password || !username) {
+    if (!success) {
+      return new NextResponse("Too Many Requests", {
+        status: 429,
+        headers: {
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+          "X-RateLimit-Reset": reset.toString(),
+          "Retry-After": Math.ceil((reset - Date.now()) / 1000).toString(),
+        },
+      });
+    }
+
+    const body = await req.json();
+
+    // Validate and sanitize input
+    const validation = signupValidation.safeParse(body);
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Invalid input", details: validation.error.errors },
         { status: 400 }
       );
     }
+
+    const { email, password, username } = validation.data;
 
     // Check existing user
     const existingUser = await prisma.user.findFirst({
@@ -41,7 +62,7 @@ export async function POST(req: Request) {
 
     const createdUser = await prisma.user.create({
       data: {
-        email: email.toLowerCase(),
+        email,
         passwordHash,
         username,
         name: "not set",

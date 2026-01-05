@@ -1,11 +1,30 @@
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
+import { apiRateLimiter, getClientIdentifier } from "@/lib/rate-limit";
+import { updateUserValidation } from "@/lib/security";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
 export async function PUT(req: Request) {
   try {
+    // Apply rate limiting
+    const identifier = getClientIdentifier(req);
+    const { success, limit, remaining, reset } =
+      await apiRateLimiter.limit(identifier);
+
+    if (!success) {
+      return new NextResponse("Too Many Requests", {
+        status: 429,
+        headers: {
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+          "X-RateLimit-Reset": reset.toString(),
+          "Retry-After": Math.ceil((reset - Date.now()) / 1000).toString(),
+        },
+      });
+    }
+
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
@@ -13,10 +32,29 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json();
-    const { name, username, email, password, image, phoneNumber, gender } = body;
+
+    // Validate and sanitize input
+    const validation = updateUserValidation.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: "Invalid input", details: validation.error.errors },
+        { status: 400 }
+      );
+    }
+
+    const { name, username, email, password, image, phoneNumber, gender } =
+      validation.data;
 
     // Validate required fields
-    if (!name && !username && !email && !password && !image && !phoneNumber && !gender) {
+    if (
+      !name &&
+      !username &&
+      !email &&
+      !password &&
+      !image &&
+      !phoneNumber &&
+      !gender
+    ) {
       return NextResponse.json(
         { error: "At least one field is required for update" },
         { status: 400 }
@@ -53,8 +91,8 @@ export async function PUT(req: Request) {
             { id: { not: session.user.id } },
             {
               OR: [
-                ...(email ? [{ email: email.toLowerCase() }] : []),
-                ...(username ? [{ username: username }] : []),
+                ...(email ? [{ email }] : []),
+                ...(username ? [{ username }] : []),
               ],
             },
           ],
@@ -62,8 +100,7 @@ export async function PUT(req: Request) {
       });
 
       if (duplicateUser) {
-        const field =
-          duplicateUser.email === email?.toLowerCase() ? "Email" : "Username";
+        const field = duplicateUser.email === email ? "Email" : "Username";
         return NextResponse.json(
           { error: `${field} already exists` },
           { status: 400 }
@@ -84,19 +121,13 @@ export async function PUT(req: Request) {
 
     if (name !== undefined) updateData.name = name;
     if (username !== undefined) updateData.username = username;
-    if (email !== undefined) updateData.email = email.toLowerCase();
+    if (email !== undefined) updateData.email = email;
     if (image !== undefined) updateData.image = image;
     if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
     if (gender !== undefined) updateData.gender = gender;
 
     // Hash new password if provided
     if (password) {
-      if (password.length < 6) {
-        return NextResponse.json(
-          { error: "Password must be at least 6 characters long" },
-          { status: 400 }
-        );
-      }
       updateData.passwordHash = await bcrypt.hash(password, 12);
     }
 
