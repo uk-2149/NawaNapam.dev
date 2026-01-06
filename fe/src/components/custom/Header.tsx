@@ -75,6 +75,28 @@ export default function Header() {
     }
   };
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      // Check if click is outside the dropdown and button
+      if (
+        !target.closest(".profile-dropdown") &&
+        !target.closest(".profile-button")
+      ) {
+        setDropdownOpen(false);
+      }
+    };
+
+    if (dropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [dropdownOpen]);
+
   // Close sidebar when clicking outside
   useEffect(() => {
     if (sidebarOpen) {
@@ -102,6 +124,54 @@ export default function Header() {
 
   return (
     <>
+      {/* Dropdown Portal */}
+      {dropdownOpen && (
+        <div className="profile-dropdown fixed top-20 right-4 sm:right-6 xl:right-25 w-64 z-50">
+          <div className="origin-top-right rounded-md bg-black backdrop-blur-2xl border border-amber-500/30 shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-amber-500/20">
+              <p
+                className="text-sm font-bold text-amber-100"
+                style={{ fontFamily: "serif" }}
+              >
+                {user!.username?.toLowerCase() ||
+                  user!.name?.split(" ")[0]?.toLowerCase() ||
+                  "not set"}
+              </p>
+              <p className="text-xs text-amber-300 truncate">
+                {user!.email}
+              </p>
+            </div>
+            <div className="py-2">
+              <Link
+                href="/dashboard"
+                onClick={() => setDropdownOpen(false)}
+                className="flex items-center gap-3 px-5 py-3 text-amber-100 hover:bg-amber-500/10 transition-colors"
+              >
+                <LayoutDashboard size={18} />
+                Dashboard
+              </Link>
+              <Link
+                href="/settings"
+                onClick={() => setDropdownOpen(false)}
+                className="flex items-center gap-3 px-5 py-3 text-amber-100 hover:bg-amber-500/10 transition-colors"
+              >
+                <Settings size={18} />
+                Settings
+              </Link>
+            </div>
+            <div className="border-t border-amber-500/20 pt-2">
+              <button
+                onClick={() => signOut({ callbackUrl: "/" })}
+                className="flex w-full items-center gap-3 px-5 py-3 text-rose-400 hover:bg-rose-500/10 transition-colors"
+              >
+                <LogOut size={18} />
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="fixed top-0 inset-x-0 z-50 bg-gradient-to-b from-black/40 via-[#0f1a0f]/90 to-transparent backdrop-blur-2xl border-b border-amber-500/20 flex items-center justify-center">
         <div className="container h-16 flex items-center justify-between px-4 sm:px-6">
           {/* Logo + Brand Name */}
@@ -134,7 +204,7 @@ export default function Header() {
                 <div className="hidden sm:block relative">
                   <button
                     onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex items-center gap-3 p-2 rounded-full hover:bg-white/10 transition-all group"
+                    className="profile-button flex items-center gap-3 p-2 rounded-full hover:bg-white/10 transition-all group"
                   >
                     <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-amber-500/50 shadow-md group-hover:ring-amber-400">
                       <Image
@@ -150,51 +220,7 @@ export default function Header() {
                     </span> */}
                   </button>
 
-                  {/* Desktop Dropdown */}
-                  {dropdownOpen && (
-                    <div className="absolute right-0 mt-3 w-64 origin-top-right rounded-md bg-black backdrop-blur-2xl border border-amber-500/30 shadow-2xl overflow-hidden">
-                      <div className="p-4 border-b border-amber-500/20">
-                        <p
-                          className="text-sm font-bold text-amber-100"
-                          style={{ fontFamily: "serif" }}
-                        >
-                          {user.username?.toLowerCase() ||
-                            user.name?.split(" ")[0]?.toLowerCase() ||
-                            "not set"}
-                        </p>
-                        <p className="text-xs text-amber-300 truncate">
-                          {user.email}
-                        </p>
-                      </div>
-                      <div className="py-2">
-                        <Link
-                          href="/dashboard"
-                          onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-3 px-5 py-3 text-amber-100 hover:bg-amber-500/10 transition-colors"
-                        >
-                          <LayoutDashboard size={18} />
-                          Dashboard
-                        </Link>
-                        <Link
-                          href="/settings"
-                          onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-3 px-5 py-3 text-amber-100 hover:bg-amber-500/10 transition-colors"
-                        >
-                          <Settings size={18} />
-                          Settings
-                        </Link>
-                      </div>
-                      <div className="border-t border-amber-500/20 pt-2">
-                        <button
-                          onClick={() => signOut({ callbackUrl: "/" })}
-                          className="flex w-full items-center gap-3 px-5 py-3 text-rose-400 hover:bg-rose-500/10 transition-colors"
-                        >
-                          <LogOut size={18} />
-                          Logout
-                        </button>
-                      </div>
-                    </div>
-                  )}
+
                 </div>
 
                 {/* Mobile User Avatar */}
