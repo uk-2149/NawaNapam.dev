@@ -132,7 +132,7 @@ export default function ProfileSettingsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a140a] via-[#0f1a0f] to-[#0a140a] text-amber-100">
       {/* Header */}
-      <header className="fixed top-0 inset-x-0 z-50 h-16 bg-white/5 backdrop-blur-2xl border-b border-amber-500/20 flex items-center justify-between px-6">
+      <header className="fixed top-0 inset-x-0 z-50 h-16 bg-white/5 backdrop-blur-2xl border-b border-amber-500/20 hidden md:flex items-center justify-between px-6">
         <Link
           href="/dashboard"
           className="group flex items-center gap-2 text-amber-200 hover:text-amber-100 text-sm font-medium transition-all"
@@ -172,9 +172,9 @@ export default function ProfileSettingsPage() {
                 {(user?.name || "U").charAt(0).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <button className="absolute bottom-2 right-2 p-3 bg-gradient-to-r from-amber-500 to-yellow-600 rounded-full shadow-xl opacity-0 group-hover:opacity-100 transition-all hover:scale-110">
+            {/* <button className="absolute bottom-2 right-2 p-3 bg-gradient-to-r from-amber-500 to-yellow-600 rounded-full shadow-xl opacity-0 group-hover:opacity-100 transition-all hover:scale-110">
               <Pencil size={18} className="text-black" />
-            </button>
+            </button> */}
           </div>
         </div>
 
