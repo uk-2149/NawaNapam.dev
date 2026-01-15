@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
-    "postbuild": "next-sitemap"
+    "postbuild": "next-sitemap",
+    "adb:reverse": "node scripts/reverse-port.js",
+    "adb:reverse:fe": "node scripts/reverse-fe.js",
+    "adb:reverse:be": "node scripts/reverse-be.js",
+    "dev:mobile": "npm run adb:reverse && npm run dev"
   },
   "dependencies": {
     "@edge-csrf/nextjs": "^2.5.2",
